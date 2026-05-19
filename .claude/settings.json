@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls \"c:\\\\Users\\\\gianq\\\\Documents\\\\prode\\\\\")",
+      "Read(//c/Users/gianq/Documents/**)",
+      "Bash(python -c \"from docx import Document; doc = Document\\('Especificacion_Prode_Mundial_2026.docx'\\); [print\\(p.text\\) for p in doc.paragraphs]\")",
+      "Bash(pip install *)",
+      "Bash(python -c ' *)",
+      "Read(//tmp/**)",
+      "Read(//c/tmp/**)",
+      "Bash(npx tsc *)",
+      "Bash(npx next *)",
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Supabase__list_tables",
+      "mcp__claude_ai_Supabase__list_migrations",
+      "mcp__claude_ai_Supabase__apply_migration",
+      "mcp__claude_ai_Supabase__get_advisors",
+      "Bash(curl -s -H \"X-Auth-Token: 099b2e92d4c344c08348267795738334\" \"https://api.football-data.org/v4/competitions\")",
+      "Bash(python -c 'import json,sys; data=json.load\\(sys.stdin\\); print\\('\\\\''Competitions:'\\\\'', data.get\\('\\\\''count'\\\\'', '\\\\''?'\\\\''\\)\\); *)",
+      "Bash(curl -s -D - -H \"X-Auth-Token: 099b2e92d4c344c08348267795738334\" \"https://api.football-data.org/v4/competitions/WC/matches?season=2026\" -o /tmp/wc_matches.json)",
+      "Bash(python -c 'import json; data=json.load\\(open\\('\\\\''/tmp/wc_matches.json'\\\\''\\)\\); print\\('\\\\''count:'\\\\'', data.get\\('\\\\''count'\\\\'','\\\\''?'\\\\''\\)\\); print\\('\\\\''error:'\\\\'', data.get\\('\\\\''message'\\\\'','\\\\''none'\\\\''\\)\\); m=data.get\\('\\\\''matches'\\\\'',[]\\); print\\('\\\\''matches:'\\\\'', len\\(m\\)\\); *)",
+      "Bash(curl -s -H \"X-Auth-Token: 099b2e92d4c344c08348267795738334\" \"https://api.football-data.org/v4/competitions/WC/matches?season=2026\")"
+    ]
+  }
+}
