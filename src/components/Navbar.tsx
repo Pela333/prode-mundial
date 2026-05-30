@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Trophy, LayoutGrid, LogOut, User, Menu, X, ShieldCheck, Swords } from 'lucide-react'
+import { Trophy, LayoutGrid, LogOut, User, Menu, X, ShieldCheck, Swords, BookOpen } from 'lucide-react'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -28,6 +28,7 @@ export default function Navbar({ username, role }: NavbarProps) {
     { href: '/prode', label: 'Grupos', icon: LayoutGrid },
     { href: '/prode/eliminatoria', label: 'Eliminatoria', icon: Swords },
     { href: '/ranking', label: 'Ranking', icon: Trophy },
+    { href: '/reglas', label: 'Reglas', icon: BookOpen },
     { href: '/perfil', label: 'Perfil', icon: User },
   ]
   if (role === 'admin') {
