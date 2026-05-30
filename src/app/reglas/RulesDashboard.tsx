@@ -375,98 +375,110 @@ export default function RulesDashboard() {
               {/* Contenedor Pronóstico vs Real */}
               <div className="grid grid-cols-2 gap-6 bg-[#0a0f1e] p-5 rounded-2xl border border-white/5">
                 {/* Pronóstico */}
-                <div className="space-y-4">
-                  <div className="text-xs font-bold text-amber-400 uppercase tracking-wider text-center border-b border-white/5 pb-2">
-                    Tu Pronóstico
-                  </div>
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="flex flex-col items-center">
-                      <span className="text-xs text-slate-500 mb-1">Local</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={predHome}
-                        onChange={e => setPredHome(Math.max(0, parseInt(e.target.value) || 0))}
-                        className="w-12 h-12 text-center text-lg font-bold rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-amber-500 score-input"
-                      />
+                <div className="space-y-4 flex flex-col justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-amber-400 uppercase tracking-wider text-center border-b border-white/5 pb-2">
+                      Tu Pronóstico
                     </div>
-                    <span className="text-slate-600 font-bold mt-4">:</span>
-                    <div className="flex flex-col items-center">
-                      <span className="text-xs text-slate-500 mb-1">Visita</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={predAway}
-                        onChange={e => setPredAway(Math.max(0, parseInt(e.target.value) || 0))}
-                        className="w-12 h-12 text-center text-lg font-bold rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-amber-500 score-input"
-                      />
+                    <div className="flex items-center justify-center gap-2 mt-4">
+                      <div className="flex flex-col items-center">
+                        <span className="text-xs text-slate-500 mb-1">Local</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={predHome}
+                          onChange={e => setPredHome(Math.max(0, parseInt(e.target.value) || 0))}
+                          className="w-12 h-12 text-center text-lg font-bold rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-amber-500 score-input"
+                        />
+                      </div>
+                      <span className="text-slate-600 font-bold mt-4">:</span>
+                      <div className="flex flex-col items-center">
+                        <span className="text-xs text-slate-500 mb-1">Visita</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={predAway}
+                          onChange={e => setPredAway(Math.max(0, parseInt(e.target.value) || 0))}
+                          className="w-12 h-12 text-center text-lg font-bold rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-amber-500 score-input"
+                        />
+                      </div>
                     </div>
                   </div>
+
+                  {/* Selector de Penales Pronosticado (Siempre Requerido en Eliminatoria) */}
+                  {simPhase === 'knockout' && (
+                    <div className="space-y-1.5 pt-4 border-t border-white/5 mt-4">
+                      <label className="text-[11px] text-slate-400 block font-semibold text-center">Ganador Penales Pronosticado</label>
+                      <select
+                        value={predPenWinner}
+                        onChange={e => setPredPenWinner(e.target.value as any)}
+                        className="w-full bg-[#0a0f1e] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 cursor-pointer"
+                      >
+                        <option value="home">Equipo Local</option>
+                        <option value="away">Equipo Visitante</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 {/* Resultado Real */}
-                <div className="space-y-4 border-l border-white/5 pl-6">
-                  <div className="text-xs font-bold text-green-400 uppercase tracking-wider text-center border-b border-white/5 pb-2">
-                    Resultado Real
-                  </div>
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="flex flex-col items-center">
-                      <span className="text-xs text-slate-500 mb-1">Local</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={realHome}
-                        onChange={e => setRealHome(Math.max(0, parseInt(e.target.value) || 0))}
-                        className="w-12 h-12 text-center text-lg font-bold rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-green-500 score-input"
-                      />
+                <div className="space-y-4 border-l border-white/5 pl-6 flex flex-col justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-green-400 uppercase tracking-wider text-center border-b border-white/5 pb-2">
+                      Resultado Real
                     </div>
-                    <span className="text-slate-600 font-bold mt-4">:</span>
-                    <div className="flex flex-col items-center">
-                      <span className="text-xs text-slate-500 mb-1">Visita</span>
-                      <input
-                        type="number"
-                        min="0"
-                        value={realAway}
-                        onChange={e => setRealAway(Math.max(0, parseInt(e.target.value) || 0))}
-                        className="w-12 h-12 text-center text-lg font-bold rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-green-500 score-input"
-                      />
+                    <div className="flex items-center justify-center gap-2 mt-4">
+                      <div className="flex flex-col items-center">
+                        <span className="text-xs text-slate-500 mb-1">Local</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={realHome}
+                          onChange={e => setRealHome(Math.max(0, parseInt(e.target.value) || 0))}
+                          className="w-12 h-12 text-center text-lg font-bold rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-green-500 score-input"
+                        />
+                      </div>
+                      <span className="text-slate-600 font-bold mt-4">:</span>
+                      <div className="flex flex-col items-center">
+                        <span className="text-xs text-slate-500 mb-1">Visita</span>
+                        <input
+                          type="number"
+                          min="0"
+                          value={realAway}
+                          onChange={e => setRealAway(Math.max(0, parseInt(e.target.value) || 0))}
+                          className="w-12 h-12 text-center text-lg font-bold rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-green-500 score-input"
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
 
-              {/* Selectores de Penales y Bonus (Eliminatoria) */}
-              {simPhase === 'knockout' && (
-                <div className="space-y-4 pt-2 border-t border-white/5">
-                  {/* Si el partido real termina en empate */}
-                  {realOutcome === 'draw' && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-xs text-slate-400 block font-medium">Ganador Penales Pronosticado</label>
-                        <select
-                          value={predPenWinner}
-                          onChange={e => setPredPenWinner(e.target.value as any)}
-                          className="w-full bg-[#0a0f1e] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
-                        >
-                          <option value="home">Equipo Local</option>
-                          <option value="away">Equipo Visitante</option>
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-xs text-slate-400 block font-medium">Ganador Penales Real</label>
-                        <select
-                          value={realPenWinner}
-                          onChange={e => setRealPenWinner(e.target.value as any)}
-                          className="w-full bg-[#0a0f1e] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-green-500"
-                        >
-                          <option value="home">Equipo Local</option>
-                          <option value="away">Equipo Visitante</option>
-                        </select>
-                      </div>
+                  {/* Selector de Penales Real (Solo si hay empate real) */}
+                  {simPhase === 'knockout' && realOutcome === 'draw' && (
+                    <div className="space-y-1.5 pt-4 border-t border-white/5 mt-4">
+                      <label className="text-[11px] text-green-400 block font-semibold text-center">Ganador Penales Real</label>
+                      <select
+                        value={realPenWinner}
+                        onChange={e => setRealPenWinner(e.target.value as any)}
+                        className="w-full bg-[#0a0f1e] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-green-500 cursor-pointer"
+                      >
+                        <option value="home">Equipo Local</option>
+                        <option value="away">Equipo Visitante</option>
+                      </select>
                     </div>
                   )}
 
-                  {/* Switch Bonus de grupo */}
+                  {/* Tip informativo para penales si no hay empate real */}
+                  {simPhase === 'knockout' && realOutcome !== 'draw' && (
+                    <div className="text-[10px] text-slate-400 bg-white/3 p-2.5 rounded-xl border border-white/5 mt-4">
+                      💡 <strong>Tanda de Penales:</strong> Solo ocurre si el Resultado Real es un empate (ej. 1-1). Al empatar, aparecerá aquí el selector del ganador real.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Bonus de grupo (Solo en eliminatoria) */}
+              {simPhase === 'knockout' && (
+                <div className="space-y-4 pt-2 border-t border-white/5">
                   <div className="flex items-center justify-between p-4 rounded-xl bg-[#0a0f1e] border border-white/5">
                     <div>
                       <span className="text-sm font-bold text-white block">¿Acertaste su posición de grupo?</span>
