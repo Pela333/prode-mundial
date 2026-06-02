@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { recalcPointsForMatch, recalcGroupPositionBonus, recalcAllPoints } from '@/lib/api/recalc'
+import { deriveBracketFromResults } from '@/lib/api/bracket'
 import { revalidatePath } from 'next/cache'
 import { GROUPS, MATCHES } from '@/lib/fixture'
 import { computeGroupStandings, type GroupMatch } from '@/lib/standings'
@@ -103,12 +104,16 @@ export async function correctResultAction(input: CorrectResultInput): Promise<Ac
     },
   })
 
-  // Recalcular puntos del match + bonus de posición de grupo (por si la corrección
-  // afecta algún partido de grupos y eso cambia las standings finales)
+  // Recalcular puntos del match + bonus de posición de grupo
   const recalculated = await recalcPointsForMatch(admin, input.matchId)
   await recalcGroupPositionBonus(admin)
 
+  // Derivar cruces eliminatorios a partir de los resultados actualizados
+  await deriveBracketFromResults(admin)
+
   revalidatePath('/admin/resultados')
+  revalidatePath('/admin/bracket')
+  revalidatePath('/prode/eliminatoria')
   revalidatePath('/ranking')
   return { ok: true, recalculated }
 }
@@ -255,7 +260,12 @@ export async function generateRandomResultsAction(): Promise<ActionResult> {
   // 4. Recalcular todos los puntos de las predicciones
   const recalculated = await recalcAllPoints(admin)
 
+  // 5. Derivar cruces eliminatorios automáticamente
+  await deriveBracketFromResults(admin)
+
   revalidatePath('/admin/resultados')
+  revalidatePath('/admin/bracket')
+  revalidatePath('/prode/eliminatoria')
   revalidatePath('/ranking')
 
   return { ok: true, recalculated }
