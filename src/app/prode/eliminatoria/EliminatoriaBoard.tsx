@@ -175,7 +175,7 @@ export default function EliminatoriaBoard({
     const lockedReason =
       status === 'submitted' ? 'Ya enviaste' :
       status === 'closed_not_submitted' ? 'Tiempo agotado' :
-      status === 'pending_api' ? 'Esperando datos de la API' : undefined
+      status === 'pending_api' ? 'Esperando confirmación del administrador' : undefined
 
     return (
       <ElimMatchCard
@@ -231,7 +231,7 @@ export default function EliminatoriaBoard({
         />
 
         {part1Status === 'pending_api' ? (
-          <PendingApiCard text="La API todavía no confirmó el cruce 2° Grupo A vs 2° Grupo B." />
+          <PendingApiCard text="El administrador todavía no confirmó el cruce 2° Grupo A vs 2° Grupo B." />
         ) : (
           <>
             <div className="max-w-md">
@@ -277,7 +277,7 @@ export default function EliminatoriaBoard({
         />
 
         {part2Status === 'pending_api' ? (
-          <PendingApiCard text="La API todavía no confirmó los 16 cruces de 16avos. Esta sección se habilita cuando termine la fase de grupos." />
+          <PendingApiCard text="El administrador todavía no confirmó los 16 cruces de 16avos. Esta sección se habilita cuando termine la fase de grupos." />
         ) : (
           <>
             {(['r32', 'r16', 'qf', 'sf', 'third', 'final'] as Phase[]).map(phase => {
@@ -364,7 +364,7 @@ function SectionHeader({
       banner = (
         <div className="rounded-xl bg-slate-700/30 border border-white/5 p-3 flex items-center gap-2 text-sm">
           <Clock size={15} className="text-slate-400" />
-          <span className="text-slate-400">Esperando confirmación de la API</span>
+          <span className="text-slate-400">Esperando confirmación del administrador</span>
         </div>
       ); break
     case 'open':

@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import Navbar from '@/components/Navbar'
-import { ShieldCheck, Calendar, Users, ChevronRight, Eye, EyeOff, Wifi, ListTodo } from 'lucide-react'
+import { ShieldCheck, Calendar, Users, ChevronRight, Eye, EyeOff, Wifi, ListTodo, GitBranch } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -26,7 +26,7 @@ export default async function AdminPage() {
 
   // KPIs
   const [{ count: totalPlayers }, { count: totalSubmissions }, { data: config }] = await Promise.all([
-    supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'player'),
+    supabase.from('profiles').select('id', { count: 'exact', head: true }),
     supabase.from('submissions').select('user_id', { count: 'exact', head: true }).eq('phase', 'group'),
     supabase.from('app_config').select('group_deadline, reveal_predictions_at, r16_first_deadline, r16_rest_deadline').eq('id', 1).maybeSingle(),
   ])
@@ -115,12 +115,18 @@ export default async function AdminPage() {
             title="Integración API"
             description="Estado de Football-Data.org, sync manual y log de errores."
           />
+          <AdminCard
+            href="/admin/bracket"
+            icon={<GitBranch size={20} className="text-amber-400" />}
+            title="Cruces Eliminatorios"
+            description="Definir y editar manualmente los cruces de las fases eliminatorias."
+          />
         </div>
 
         <div className="mt-8 rounded-2xl bg-slate-900/40 border border-white/5 p-4">
           <p className="text-slate-500 text-xs">
             Las fechas límite de la fase eliminatoria se configuran automáticamente
-            cuando la API detecta los cruces de 16avos.
+            cuando el administrador define los cruces de 16avos.
           </p>
         </div>
       </main>

@@ -364,7 +364,7 @@ async function markSync(supabase: SupabaseClient, status: 'ok' | 'error') {
  *
  * Sólo actualiza si los valores cambiaron.
  */
-async function maybeUpdateR32Deadlines(
+export async function maybeUpdateR32Deadlines(
   supabase: SupabaseClient,
   bracket: { match_id: string; phase: Phase; position: number; defined: boolean; scheduled_at: string | null }[],
 ) {
