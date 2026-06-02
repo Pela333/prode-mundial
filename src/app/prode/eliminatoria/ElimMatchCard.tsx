@@ -30,6 +30,8 @@ export interface ElimMatchCardProps {
   realWentToPens?: boolean | null
   realPenWinner?: string | null
   realStatus?: string | null
+  resultPoints?: number | null
+  bonusPoints?: number | null
 }
 
 export default function ElimMatchCard(props: ElimMatchCardProps) {
@@ -114,19 +116,64 @@ export default function ElimMatchCard(props: ElimMatchCardProps) {
     ? format(new Date(props.scheduledAt), "d MMM · HH:mm", { locale: es })
     : 'A definir'
 
+  const getTooltip = () => {
+    if (props.resultPoints === null && props.bonusPoints === null) return undefined
+    const rp = props.resultPoints ?? 0
+    const bp = props.bonusPoints ?? 0
+    const total = rp + bp
+
+    const lines: string[] = [`Total: +${total} pt${total === 1 ? '' : 's'}`]
+    if (rp === 3) {
+      lines.push(`  • +3 pts: Resultado exacto a 120' (${props.realHome120}:${props.realAway120})`)
+    } else if (rp === 1) {
+      const ph = parseScore(home)
+      const pa = parseScore(away)
+      if (ph !== null && pa !== null && ph === pa) {
+        lines.push("  • +1 pt: Empate correcto a 120'")
+      } else {
+        lines.push("  • +1 pt: Ganador correcto a 120'")
+      }
+    } else {
+      lines.push("  • 0 pts: Resultado incorrecto a 120'")
+    }
+
+    if (props.realWentToPens) {
+      const isWinnerCorrect = props.realPenWinner && penWinner === props.realPenWinner
+      if (isWinnerCorrect) {
+        lines.push('  • +1 pt: Ganador de penales correcto')
+      } else {
+        lines.push('  • 0 pts: Ganador de penales incorrecto')
+      }
+    }
+
+    const hasPenBonus = props.realWentToPens && penWinner && props.realPenWinner && penWinner === props.realPenWinner
+    const penBonusPts = hasPenBonus ? 1 : 0
+    const classificationBonusPts = bp - penBonusPts
+    if (classificationBonusPts > 0) {
+      lines.push('  • +1 pt: Equipo clasificado en posición correcta de grupo')
+    }
+
+    return lines.join('\n')
+  }
+
   const pointsBadge = () => {
     if (props.points === null || props.points === undefined) return null
+    const tooltip = getTooltip()
     if (props.points >= 3) return (
-      <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-400/10 text-amber-400 border border-amber-400/20">
+      <span title={tooltip} className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-400/10 text-amber-400 border border-amber-400/20 cursor-help">
         +{props.points}
       </span>
     )
     if (props.points >= 1) return (
-      <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-400/10 text-green-400 border border-green-400/20">
+      <span title={tooltip} className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-400/10 text-green-400 border border-green-400/20 cursor-help">
         +{props.points}
       </span>
     )
-    return null
+    return (
+      <span title={tooltip} className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-700/40 text-slate-500 border border-slate-700/40 cursor-help">
+        0 pts
+      </span>
+    )
   }
 
   return (

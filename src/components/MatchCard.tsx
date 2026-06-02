@@ -24,6 +24,8 @@ interface MatchCardProps {
   realHomeScore?: number | null
   realAwayScore?: number | null
   realStatus?: string | null
+  resultPoints?: number | null
+  bonusPoints?: number | null
 }
 
 export default function MatchCard({
@@ -38,6 +40,8 @@ export default function MatchCard({
   realHomeScore,
   realAwayScore,
   realStatus,
+  resultPoints,
+  bonusPoints,
 }: MatchCardProps) {
   const [home, setHome] = useState<string>(initialHome != null ? String(initialHome) : '')
   const [away, setAway] = useState<string>(initialAway != null ? String(initialAway) : '')
@@ -107,20 +111,35 @@ export default function MatchCard({
   const matchDate = new Date(match.date)
   const dateStr = format(matchDate, "d 'de' MMMM · HH:mm", { locale: es })
 
+  const getTooltip = () => {
+    if (resultPoints === null || resultPoints === undefined) return undefined
+    if (resultPoints === 3) return '+3 pts: Resultado exacto'
+    if (resultPoints === 1) {
+      const ph = parseScore(home)
+      const pa = parseScore(away)
+      if (ph !== null && pa !== null && ph === pa) {
+        return '+1 pt: Empate correcto'
+      }
+      return '+1 pt: Ganador correcto'
+    }
+    return '0 pts: Sin acierto'
+  }
+
   const pointsBadge = () => {
     if (points === null || points === undefined) return null
+    const tooltip = getTooltip()
     if (points >= 3) return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-400/10 text-amber-400 border border-amber-400/20">
+      <span title={tooltip} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-400/10 text-amber-400 border border-amber-400/20 cursor-help">
         +{points} exacto
       </span>
     )
     if (points >= 1) return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-green-400/10 text-green-400 border border-green-400/20">
+      <span title={tooltip} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-green-400/10 text-green-400 border border-green-400/20 cursor-help">
         +{points} pt
       </span>
     )
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-slate-700/40 text-slate-500 border border-slate-700/40">
+      <span title={tooltip} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-slate-700/40 text-slate-500 border border-slate-700/40 cursor-help">
         0 pts
       </span>
     )

@@ -162,6 +162,59 @@ function Row({
 
   const pts = pred ? (pred.result_points ?? 0) + (pred.bonus_points ?? 0) : null
 
+  const getTooltip = () => {
+    if (!pred || pred.result_points === null) return undefined
+    
+    if (!isElim) {
+      const rp = pred.result_points ?? 0
+      if (rp === 3) return '+3 pts: Resultado exacto'
+      if (rp === 1) {
+        if (pred.home_score !== null && pred.away_score !== null && pred.home_score === pred.away_score) {
+          return '+1 pt: Empate correcto'
+        }
+        return '+1 pt: Ganador correcto'
+      }
+      return '0 pts: Sin acierto'
+    } else {
+      const rp = pred.result_points ?? 0
+      const bp = pred.bonus_points ?? 0
+      const total = rp + bp
+
+      const lines: string[] = [`Total: +${total} pt${total === 1 ? '' : 's'}`]
+      if (rp === 3) {
+        lines.push(`  • +3 pts: Resultado exacto a 120' (${real?.home_score_120}:${real?.away_score_120})`)
+      } else if (rp === 1) {
+        if (pred.home_score_120 !== null && pred.away_score_120 !== null && pred.home_score_120 === pred.away_score_120) {
+          lines.push("  • +1 pt: Empate correcto a 120'")
+        } else {
+          lines.push("  • +1 pt: Ganador correcto a 120'")
+        }
+      } else {
+        lines.push("  • 0 pts: Resultado incorrecto a 120'")
+      }
+
+      if (real?.went_to_pens) {
+        const isWinnerCorrect = real.pen_winner && pred.pen_winner === real.pen_winner
+        if (isWinnerCorrect) {
+          lines.push('  • +1 pt: Ganador de penales correcto')
+        } else {
+          lines.push('  • 0 pts: Ganador de penales incorrecto')
+        }
+      }
+
+      const hasPenBonus = real?.went_to_pens && pred.pen_winner && real.pen_winner && pred.pen_winner === real.pen_winner
+      const penBonusPts = hasPenBonus ? 1 : 0
+      const classificationBonusPts = bp - penBonusPts
+      if (classificationBonusPts > 0) {
+        lines.push('  • +1 pt: Equipo clasificado en posición correcta de grupo')
+      }
+
+      return lines.join('\n')
+    }
+  }
+
+  const tooltip = getTooltip()
+
   return (
     <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-4 py-3 items-center text-sm hover:bg-white/2 transition-colors">
       <div className="flex items-center gap-2.5 min-w-0">
@@ -179,7 +232,7 @@ function Row({
       </span>
       <div className="w-12 text-right">
         {pts != null ? (
-          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+          <span title={tooltip} className={`text-xs font-bold px-2 py-0.5 rounded-full cursor-help ${
             pts >= 3
               ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
               : pts > 0
