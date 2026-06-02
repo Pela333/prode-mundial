@@ -17,7 +17,7 @@ export default async function HomePage() {
 
       <div className="relative max-w-md animate-fade-in-up">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/messi.png" alt="Prode" className="w-20 h-20 object-contain rounded-3xl mx-auto mb-6 shadow-2xl shadow-amber-500/20" />
+        <img src="/messi.png" alt="Prode" className="w-36 h-36 object-contain rounded-3xl mx-auto mb-6 shadow-2xl shadow-amber-500/20" />
 
         <h1 className="text-4xl font-black text-white mb-3">
           Prode <span className="text-amber-400">Mundial 2026</span>

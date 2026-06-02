@@ -42,7 +42,7 @@ export default function Navbar({ username, role }: NavbarProps) {
         <div className="flex items-center gap-3">
           <Link href="/prode" className="flex items-center gap-2 group">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/messi.png" alt="Prode" className="w-8 h-8 object-contain rounded-lg shadow-lg group-hover:scale-105 transition-transform" />
+            <img src="/messi.png" alt="Prode" className="w-12 h-12 object-contain rounded-lg shadow-lg group-hover:scale-105 transition-transform" />
             <span className="font-bold text-white text-lg tracking-tight hidden sm:block">
               Prode <span className="text-amber-400">2026</span>
             </span>
