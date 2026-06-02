@@ -18,12 +18,20 @@ interface PredictionRow {
   bonus_points?: number | null
 }
 
+interface RealResultRow {
+  match_id: string
+  home_score: number | null
+  away_score: number | null
+  status: string
+}
+
 interface GroupStageBoardProps {
   groups: Group[]
   matches: Match[]
   initialPredictions: PredictionRow[]
   submittedAt: string | null
   groupDeadline: string | null
+  realResults: RealResultRow[]
 }
 
 type ScoresState = Record<string, { home: number | null; away: number | null }>
@@ -36,6 +44,7 @@ export default function GroupStageBoard({
   initialPredictions,
   submittedAt,
   groupDeadline,
+  realResults,
 }: GroupStageBoardProps) {
   const deadlineDate = groupDeadline ? new Date(groupDeadline) : null
   const deadlinePassed = !!deadlineDate && deadlineDate.getTime() < Date.now()
@@ -51,6 +60,12 @@ export default function GroupStageBoard({
     status === 'submitted' ? 'Ya enviaste tus pronósticos' :
     status === 'closed_not_submitted' ? 'La fecha límite ya pasó' :
     undefined
+
+  const resultsByMatch = useMemo(() => {
+    const m = new Map<string, RealResultRow>()
+    for (const r of realResults) m.set(r.match_id, r)
+    return m
+  }, [realResults])
 
   // Estado local de scores: se inicializa con las predictions guardadas
   const [scores, setScores] = useState<ScoresState>(() => {
@@ -217,6 +232,7 @@ export default function GroupStageBoard({
               {gMatches.map(match => {
                 const pred = initialPredictions.find(p => p.match_id === match.id)
                 const matchStarted = new Date(match.date) < new Date()
+                const matchResult = resultsByMatch.get(match.id)
                 return (
                   <MatchCard
                     key={match.id}
@@ -228,6 +244,9 @@ export default function GroupStageBoard({
                     lockedReason={lockedReason}
                     matchStarted={matchStarted}
                     onChange={handleCardChange}
+                    realHomeScore={matchResult?.home_score ?? null}
+                    realAwayScore={matchResult?.away_score ?? null}
+                    realStatus={matchResult?.status ?? null}
                   />
                 )
               })}

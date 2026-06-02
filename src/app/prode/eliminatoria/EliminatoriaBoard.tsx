@@ -28,6 +28,15 @@ interface PredRow {
   bonus_points: number | null
 }
 
+interface RealResultRow {
+  match_id: string
+  home_score_120: number | null
+  away_score_120: number | null
+  went_to_pens: boolean | null
+  pen_winner: string | null
+  status: string
+}
+
 interface ElimBoardProps {
   slots: BracketSlot[]
   bracket: BracketRow[]
@@ -36,6 +45,7 @@ interface ElimBoardProps {
   submittedR32Rest: string | null
   r32FirstDeadline: string | null
   r32RestDeadline: string | null
+  realResults: RealResultRow[]
 }
 
 type Status = 'pending_api' | 'open' | 'submitted' | 'closed_not_submitted'
@@ -50,6 +60,7 @@ export default function EliminatoriaBoard({
   submittedR32Rest,
   r32FirstDeadline,
   r32RestDeadline,
+  realResults,
 }: ElimBoardProps) {
   const bracketByMatch = useMemo(() => {
     const m = new Map<string, BracketRow>()
@@ -62,6 +73,12 @@ export default function EliminatoriaBoard({
     for (const p of initialPredictions) m.set(p.match_id, p)
     return m
   }, [initialPredictions])
+
+  const resultsByMatch = useMemo(() => {
+    const m = new Map<string, RealResultRow>()
+    for (const r of realResults) m.set(r.match_id, r)
+    return m
+  }, [realResults])
 
   const r32_1 = bracketByMatch.get(R32_FIRST)
   const r32_1_defined = r32_1?.defined === true
@@ -169,6 +186,7 @@ export default function EliminatoriaBoard({
   function renderSlot(slot: BracketSlot) {
     const b = bracketByMatch.get(slot.id)
     const p = predByMatch.get(slot.id)
+    const r = resultsByMatch.get(slot.id)
     const isPart1 = slot.id === R32_FIRST
     const status = isPart1 ? part1Status : part2Status
     const locked = status !== 'open'
@@ -193,6 +211,11 @@ export default function EliminatoriaBoard({
         locked={locked}
         lockedReason={lockedReason}
         onChange={handleCardChange}
+        realHome120={r?.home_score_120 ?? null}
+        realAway120={r?.away_score_120 ?? null}
+        realWentToPens={r?.went_to_pens ?? false}
+        realPenWinner={r?.pen_winner ?? null}
+        realStatus={r?.status ?? null}
       />
     )
   }

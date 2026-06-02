@@ -9,8 +9,8 @@ import { updateConfigAction } from './actions'
 interface ConfigFormProps {
   initialGroupDeadline: string | null
   initialRevealAt: string | null
-  r16FirstDeadline: string | null
-  r16RestDeadline: string | null
+  r32FirstDeadline: string | null
+  r32RestDeadline: string | null
 }
 
 /**
@@ -42,13 +42,17 @@ function fmtRead(iso: string | null) {
 export default function ConfigForm(props: ConfigFormProps) {
   const [groupDeadline, setGroupDeadline] = useState(isoToLocalInput(props.initialGroupDeadline))
   const [revealAt, setRevealAt] = useState(isoToLocalInput(props.initialRevealAt))
+  const [r32First, setR32First] = useState(isoToLocalInput(props.r32FirstDeadline))
+  const [r32Rest, setR32Rest] = useState(isoToLocalInput(props.r32RestDeadline))
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [isPending, startTransition] = useTransition()
 
   const dirty =
     groupDeadline !== isoToLocalInput(props.initialGroupDeadline) ||
-    revealAt !== isoToLocalInput(props.initialRevealAt)
+    revealAt !== isoToLocalInput(props.initialRevealAt) ||
+    r32First !== isoToLocalInput(props.r32FirstDeadline) ||
+    r32Rest !== isoToLocalInput(props.r32RestDeadline)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -59,6 +63,8 @@ export default function ConfigForm(props: ConfigFormProps) {
       const res = await updateConfigAction({
         groupDeadline: localInputToIso(groupDeadline),
         revealPredictionsAt: localInputToIso(revealAt),
+        r32FirstDeadline: localInputToIso(r32First),
+        r32RestDeadline: localInputToIso(r32Rest),
       })
       if (res.error) { setError(res.error); return }
       setSuccess(true)
@@ -90,13 +96,24 @@ export default function ConfigForm(props: ConfigFormProps) {
         />
       </section>
 
-      {/* Lectura: r16 deadlines (los setea la API) */}
-      <section className="rounded-2xl bg-slate-900/40 border border-white/5 p-5 space-y-3">
-        <h2 className="text-slate-400 font-semibold text-xs uppercase tracking-wide">
-          Eliminatoria — autoconfigurado por la API (Fase 3 pendiente)
+      {/* Eliminatoria deadlines */}
+      <section className="rounded-2xl bg-[#111827] border border-white/8 p-5 space-y-4">
+        <h2 className="text-white font-semibold text-sm flex items-center gap-2">
+          <Calendar size={14} className="text-amber-400" /> Fase Eliminatoria
         </h2>
-        <ReadField label="Deadline 1er partido 16avos" value={fmtRead(props.r16FirstDeadline)} />
-        <ReadField label="Deadline resto de la eliminatoria" value={fmtRead(props.r16RestDeadline)} />
+        <p className="text-slate-500 text-xs leading-relaxed">
+          Estas fechas límite se calculan automáticamente a partir de los partidos reales de la API (1 hora antes de iniciar). Podés modificarlas manualmente aquí si la API llega a fallar.
+        </p>
+        <DatetimeField
+          label="Deadline 1er partido (R32_1)"
+          value={r32First}
+          onChange={setR32First}
+        />
+        <DatetimeField
+          label="Deadline resto de la eliminatoria"
+          value={r32Rest}
+          onChange={setR32Rest}
+        />
       </section>
 
       {error && (

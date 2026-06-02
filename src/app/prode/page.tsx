@@ -29,6 +29,12 @@ export default async function ProdePage() {
     .eq('user_id', user.id)
     .eq('phase', 'group')
 
+  // Resultados reales de fase de grupos
+  const { data: results } = await supabase
+    .from('results')
+    .select('match_id, home_score, away_score, status')
+    .eq('phase', 'group')
+
   // Submission de fase de grupos (si confirmó envío)
   const { data: submission } = await supabase
     .from('submissions')
@@ -56,6 +62,7 @@ export default async function ProdePage() {
           initialPredictions={predictions ?? []}
           submittedAt={submission?.submitted_at ?? null}
           groupDeadline={groupDeadline?.toISOString() ?? null}
+          realResults={results ?? []}
         />
       </main>
     </div>

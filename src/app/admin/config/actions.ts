@@ -6,7 +6,10 @@ import { revalidatePath } from 'next/cache'
 export interface UpdateConfigInput {
   groupDeadline: string | null         // ISO string o null
   revealPredictionsAt: string | null   // ISO string o null
+  r32FirstDeadline: string | null      // ISO string o null
+  r32RestDeadline: string | null       // ISO string o null
 }
+
 
 export interface ActionResult {
   ok?: boolean
@@ -38,6 +41,8 @@ export async function updateConfigAction(input: UpdateConfigInput): Promise<Acti
     .update({
       group_deadline: input.groupDeadline,
       reveal_predictions_at: input.revealPredictionsAt,
+      r32_first_deadline: input.r32FirstDeadline,
+      r32_rest_deadline: input.r32RestDeadline,
     })
     .eq('id', 1)
 

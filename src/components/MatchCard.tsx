@@ -21,6 +21,9 @@ interface MatchCardProps {
   matchStarted?: boolean
   /** Notifica al padre cuando cambian los scores localmente (para validación de completitud) */
   onChange?: (matchId: string, home: number | null, away: number | null) => void
+  realHomeScore?: number | null
+  realAwayScore?: number | null
+  realStatus?: string | null
 }
 
 export default function MatchCard({
@@ -32,6 +35,9 @@ export default function MatchCard({
   lockedReason,
   matchStarted,
   onChange,
+  realHomeScore,
+  realAwayScore,
+  realStatus,
 }: MatchCardProps) {
   const [home, setHome] = useState<string>(initialHome != null ? String(initialHome) : '')
   const [away, setAway] = useState<string>(initialAway != null ? String(initialAway) : '')
@@ -155,32 +161,39 @@ export default function MatchCard({
           <TeamName name={match.home} align="left" size="md" />
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <input
-            type="text"
-            inputMode="numeric"
-            value={home}
-            onChange={e => handleInput(setHome, e.target.value)}
-            onBlur={() => persist(home, away)}
-            disabled={locked}
-            placeholder="–"
-            aria-label={`Goles de ${match.home}`}
-            className="score-input w-12 h-12 text-center text-xl font-bold rounded-xl border-2 bg-white/5 text-white outline-none transition-all
-              border-white/10 focus:border-amber-500 focus:bg-amber-500/5 disabled:opacity-40 disabled:cursor-not-allowed"
-          />
-          <span className="text-slate-600 font-bold text-lg select-none">:</span>
-          <input
-            type="text"
-            inputMode="numeric"
-            value={away}
-            onChange={e => handleInput(setAway, e.target.value)}
-            onBlur={() => persist(home, away)}
-            disabled={locked}
-            placeholder="–"
-            aria-label={`Goles de ${match.away}`}
-            className="score-input w-12 h-12 text-center text-xl font-bold rounded-xl border-2 bg-white/5 text-white outline-none transition-all
-              border-white/10 focus:border-amber-500 focus:bg-amber-500/5 disabled:opacity-40 disabled:cursor-not-allowed"
-          />
+        <div className="flex flex-col items-center gap-1 shrink-0">
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              inputMode="numeric"
+              value={home}
+              onChange={e => handleInput(setHome, e.target.value)}
+              onBlur={() => persist(home, away)}
+              disabled={locked}
+              placeholder="–"
+              aria-label={`Goles de ${match.home}`}
+              className="score-input w-12 h-12 text-center text-xl font-bold rounded-xl border-2 bg-white/5 text-white outline-none transition-all
+                border-white/10 focus:border-amber-500 focus:bg-amber-500/5 disabled:opacity-40 disabled:cursor-not-allowed"
+            />
+            <span className="text-slate-600 font-bold text-lg select-none">:</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={away}
+              onChange={e => handleInput(setAway, e.target.value)}
+              onBlur={() => persist(home, away)}
+              disabled={locked}
+              placeholder="–"
+              aria-label={`Goles de ${match.away}`}
+              className="score-input w-12 h-12 text-center text-xl font-bold rounded-xl border-2 bg-white/5 text-white outline-none transition-all
+                border-white/10 focus:border-amber-500 focus:bg-amber-500/5 disabled:opacity-40 disabled:cursor-not-allowed"
+            />
+          </div>
+          {realStatus === 'finished' && realHomeScore != null && realAwayScore != null && (
+            <span className="text-[11px] text-green-400 font-bold bg-green-500/10 border border-green-500/20 px-2 py-0.5 rounded-md mt-0.5 select-none whitespace-nowrap">
+              Real: {realHomeScore} : {realAwayScore}
+            </span>
+          )}
         </div>
 
         <div className="flex-1 min-w-0 flex justify-end">

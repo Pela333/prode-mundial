@@ -31,6 +31,12 @@ export default async function EliminatoriaPage() {
     .eq('user_id', user.id)
     .neq('phase', 'group')
 
+  // Resultados reales de eliminatoria
+  const { data: results } = await supabase
+    .from('results')
+    .select('match_id, home_score_120, away_score_120, went_to_pens, pen_winner, status')
+    .neq('phase', 'group')
+
   // Submissions
   const { data: subs } = await supabase
     .from('submissions')
@@ -59,6 +65,7 @@ export default async function EliminatoriaPage() {
           submittedR32Rest={submittedR32Rest}
           r32FirstDeadline={config?.r32_first_deadline ?? null}
           r32RestDeadline={config?.r32_rest_deadline ?? null}
+          realResults={results ?? []}
         />
       </main>
     </div>

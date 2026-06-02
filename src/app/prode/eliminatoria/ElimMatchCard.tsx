@@ -24,6 +24,12 @@ export interface ElimMatchCardProps {
   lockedReason?: string
 
   onChange?: (matchId: string, home: number | null, away: number | null, pen: string | null) => void
+
+  realHome120?: number | null
+  realAway120?: number | null
+  realWentToPens?: boolean | null
+  realPenWinner?: string | null
+  realStatus?: string | null
 }
 
 export default function ElimMatchCard(props: ElimMatchCardProps) {
@@ -152,28 +158,38 @@ export default function ElimMatchCard(props: ElimMatchCardProps) {
               ? <TeamName name={props.homeTeam} align="left" size="md" />
               : <span className="text-slate-600 italic text-sm">A definir</span>}
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <input
-              type="text" inputMode="numeric"
-              value={home}
-              onChange={e => handleScore(setHome, e.target.value)}
-              onBlur={() => persist(home, away, penWinner)}
-              disabled={inputDisabled}
-              placeholder="–"
-              aria-label={`Goles a 120' de ${props.homeTeam ?? 'local'}`}
-              className="score-input w-11 h-11 text-center text-lg font-bold rounded-lg border-2 bg-white/5 text-white outline-none border-white/10 focus:border-amber-500 focus:bg-amber-500/5 disabled:opacity-40 disabled:cursor-not-allowed"
-            />
-            <span className="text-slate-600 text-sm select-none">:</span>
-            <input
-              type="text" inputMode="numeric"
-              value={away}
-              onChange={e => handleScore(setAway, e.target.value)}
-              onBlur={() => persist(home, away, penWinner)}
-              disabled={inputDisabled}
-              placeholder="–"
-              aria-label={`Goles a 120' de ${props.awayTeam ?? 'visitante'}`}
-              className="score-input w-11 h-11 text-center text-lg font-bold rounded-lg border-2 bg-white/5 text-white outline-none border-white/10 focus:border-amber-500 focus:bg-amber-500/5 disabled:opacity-40 disabled:cursor-not-allowed"
-            />
+          <div className="flex flex-col items-center gap-1 shrink-0">
+            <div className="flex items-center gap-1.5 shrink-0">
+              <input
+                type="text" inputMode="numeric"
+                value={home}
+                onChange={e => handleScore(setHome, e.target.value)}
+                onBlur={() => persist(home, away, penWinner)}
+                disabled={inputDisabled}
+                placeholder="–"
+                aria-label={`Goles a 120' de ${props.homeTeam ?? 'local'}`}
+                className="score-input w-11 h-11 text-center text-lg font-bold rounded-lg border-2 bg-white/5 text-white outline-none border-white/10 focus:border-amber-500 focus:bg-amber-500/5 disabled:opacity-40 disabled:cursor-not-allowed"
+              />
+              <span className="text-slate-600 text-sm select-none">:</span>
+              <input
+                type="text" inputMode="numeric"
+                value={away}
+                onChange={e => handleScore(setAway, e.target.value)}
+                onBlur={() => persist(home, away, penWinner)}
+                disabled={inputDisabled}
+                placeholder="–"
+                aria-label={`Goles a 120' de ${props.awayTeam ?? 'visitante'}`}
+                className="score-input w-11 h-11 text-center text-lg font-bold rounded-lg border-2 bg-white/5 text-white outline-none border-white/10 focus:border-amber-500 focus:bg-amber-500/5 disabled:opacity-40 disabled:cursor-not-allowed"
+              />
+            </div>
+            {props.realStatus === 'finished' && props.realHome120 != null && props.realAway120 != null && (
+              <span className="text-[10px] text-green-400 font-bold bg-green-500/10 border border-green-500/20 px-1.5 py-0.5 rounded mt-0.5 select-none whitespace-nowrap">
+                Real: {props.realHome120}:{props.realAway120}
+                {props.realWentToPens && props.realPenWinner && (
+                  <span className="text-amber-400 ml-1">({props.realPenWinner.slice(0, 3)})</span>
+                )}
+              </span>
+            )}
           </div>
           <div className="flex-1 min-w-0 flex justify-end">
             {props.awayTeam

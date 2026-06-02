@@ -19,7 +19,7 @@ export default async function AdminConfigPage() {
 
   const { data: config } = await supabase
     .from('app_config')
-    .select('group_deadline, reveal_predictions_at, r16_first_deadline, r16_rest_deadline')
+    .select('group_deadline, reveal_predictions_at, r32_first_deadline, r32_rest_deadline')
     .eq('id', 1)
     .maybeSingle()
 
@@ -43,8 +43,8 @@ export default async function AdminConfigPage() {
         <ConfigForm
           initialGroupDeadline={config?.group_deadline ?? null}
           initialRevealAt={config?.reveal_predictions_at ?? null}
-          r16FirstDeadline={config?.r16_first_deadline ?? null}
-          r16RestDeadline={config?.r16_rest_deadline ?? null}
+          r32FirstDeadline={config?.r32_first_deadline ?? null}
+          r32RestDeadline={config?.r32_rest_deadline ?? null}
         />
       </main>
     </div>
