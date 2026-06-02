@@ -3,10 +3,10 @@
 import { useState, useTransition } from 'react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { CheckCircle2, AlertCircle, Loader2, Edit3, X, Save, ShieldAlert, Clock } from 'lucide-react'
+import { CheckCircle2, AlertCircle, Loader2, Edit3, X, Save, ShieldAlert, Clock, Shuffle } from 'lucide-react'
 import TeamName from '@/components/TeamName'
 import type { Phase } from '@/lib/fixture'
-import { correctResultAction } from './actions'
+import { correctResultAction, generateRandomResultsAction } from './actions'
 
 export interface ResultRow {
   match_id: string
@@ -35,10 +35,77 @@ export interface BracketLite {
 
 export default function ResultsTable({ rows }: { rows: ResultRow[] }) {
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [isGenerating, startGenTransition] = useTransition()
+  const [genError, setGenError] = useState<string | null>(null)
+  const [genSuccess, setGenSuccess] = useState<string | null>(null)
+
   const editing = rows.find(r => r.match_id === editingId)
+
+  function handleGenerateRandom() {
+    const confirm = window.confirm(
+      "¿Estás seguro de que querés generar resultados aleatorios reales para todos los partidos sincronizados?\n\nEsto sobrescribirá todos los marcadores reales actuales en la base de datos y recalculará los puntos de los participantes."
+    )
+    if (!confirm) return
+
+    setGenError(null)
+    setGenSuccess(null)
+
+    startGenTransition(async () => {
+      const res = await generateRandomResultsAction()
+      if (res.error) {
+        setGenError(res.error)
+      } else {
+        setGenSuccess(`¡Éxito! Se actualizaron los partidos y se recalcularon ${res.recalculated ?? 0} predicciones.`)
+        setTimeout(() => {
+          window.location.reload()
+        }, 2000)
+      }
+    })
+  }
 
   return (
     <>
+      {/* Botonera de acciones globales */}
+      <div className="mb-6 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between p-5 rounded-2xl bg-slate-900/30 border border-white/5 backdrop-blur-md">
+        <div>
+          <h3 className="text-white font-bold text-sm">Simulador de fixture</h3>
+          <p className="text-xs text-slate-400">Generá marcadores realistas automáticos para testear el comportamiento del prode.</p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+          <button
+            onClick={handleGenerateRandom}
+            disabled={isGenerating || rows.length === 0}
+            className="relative overflow-hidden group flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm text-black bg-gradient-to-r from-amber-400 via-amber-300 to-amber-400 hover:from-amber-300 hover:to-amber-300 transition-all duration-300 disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-amber-500/10 hover:shadow-amber-500/25 border border-amber-500/20 active:scale-95 cursor-pointer"
+          >
+            {isGenerating ? (
+              <>
+                <Loader2 size={16} className="animate-spin text-black" />
+                <span>Generando y recalculando...</span>
+              </>
+            ) : (
+              <>
+                <Shuffle size={15} className="text-black group-hover:rotate-180 transition-transform duration-500" />
+                <span>Cargar resultados aleatorios</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {genError && (
+        <div className="mb-4 flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 animate-fade-in">
+          <AlertCircle size={16} className="shrink-0" />
+          <span>{genError}</span>
+        </div>
+      )}
+
+      {genSuccess && (
+        <div className="mb-4 flex items-center gap-2 text-green-400 text-sm bg-green-500/10 border border-green-500/20 rounded-xl px-4 py-3 animate-fade-in">
+          <CheckCircle2 size={16} className="shrink-0" />
+          <span>{genSuccess}</span>
+        </div>
+      )}
+
       <div className="rounded-2xl border border-white/6 overflow-hidden bg-[#111827]">
         <div className="hidden md:grid grid-cols-[auto_1fr_auto_auto_auto] gap-3 px-4 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wide border-b border-white/5">
           <span className="w-20">Fase</span>

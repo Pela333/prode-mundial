@@ -2,8 +2,10 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { recalcPointsForMatch, recalcGroupPositionBonus } from '@/lib/api/recalc'
+import { recalcPointsForMatch, recalcGroupPositionBonus, recalcAllPoints } from '@/lib/api/recalc'
 import { revalidatePath } from 'next/cache'
+import { GROUPS, MATCHES } from '@/lib/fixture'
+import { computeGroupStandings, type GroupMatch } from '@/lib/standings'
 
 export interface CorrectResultInput {
   matchId: string
@@ -108,5 +110,153 @@ export async function correctResultAction(input: CorrectResultInput): Promise<Ac
 
   revalidatePath('/admin/resultados')
   revalidatePath('/ranking')
+  return { ok: true, recalculated }
+}
+
+export async function generateRandomResultsAction(): Promise<ActionResult> {
+  const { user, isAdmin } = await assertAdmin()
+  if (!isAdmin || !user) return { error: 'No autorizado' }
+
+  const admin = createAdminClient()
+
+  // 1. Obtener todos los partidos en results
+  const { data: results, error: resultsError } = await admin
+    .from('results')
+    .select('*')
+
+  if (resultsError) return { error: 'Error al obtener partidos: ' + resultsError.message }
+  if (!results || results.length === 0) {
+    return { error: 'No hay partidos en la tabla results. Hacé un sync primero.' }
+  }
+
+  // 2. Obtener datos de bracket para saber los nombres de equipos de eliminatorias
+  const { data: bracketRows, error: bracketError } = await admin
+    .from('bracket')
+    .select('match_id, home_team, away_team')
+
+  if (bracketError) return { error: 'Error al obtener bracket: ' + bracketError.message }
+
+  const bracketMap = new Map(
+    (bracketRows ?? []).map(b => [b.match_id, { home: b.home_team, away: b.away_team }])
+  )
+
+  // Función para marcadores de fútbol realistas
+  function getRandomScore(): number {
+    const r = Math.random()
+    if (r < 0.20) return 0
+    if (r < 0.55) return 1
+    if (r < 0.80) return 2
+    if (r < 0.92) return 3
+    if (r < 0.98) return 4
+    return 5
+  }
+
+  const updatedResults = []
+
+  for (const r of results) {
+    const isGroup = r.phase === 'group'
+    let home_score: number | null = null
+    let away_score: number | null = null
+    let home_score_120: number | null = null
+    let away_score_120: number | null = null
+    let went_to_pens = false
+    let pen_winner: string | null = null
+
+    if (isGroup) {
+      home_score = getRandomScore()
+      away_score = getRandomScore()
+    } else {
+      home_score_120 = getRandomScore()
+      away_score_120 = getRandomScore()
+
+      if (home_score_120 === away_score_120) {
+        went_to_pens = true
+        const b = bracketMap.get(r.match_id)
+        if (b && b.home && b.away) {
+          pen_winner = Math.random() < 0.5 ? b.home : b.away
+        }
+      }
+    }
+
+    updatedResults.push({
+      match_id: r.match_id,
+      phase: r.phase,
+      home_score,
+      away_score,
+      home_score_120,
+      away_score_120,
+      went_to_pens,
+      pen_winner,
+      status: 'finished',
+      manual_override: true,
+      corrected_by: user.id,
+      corrected_at: new Date().toISOString(),
+    })
+  }
+
+  // Guardar resultados
+  const { error: upsertError } = await admin
+    .from('results')
+    .upsert(updatedResults, { onConflict: 'match_id' })
+
+  if (upsertError) return { error: 'Error al guardar resultados: ' + upsertError.message }
+
+  // 3. Calcular standings reales para cada grupo
+  const standingsUpserts = []
+  const groupMatches = MATCHES.filter(m => m.phase === 'group')
+  const resultsMap = new Map(updatedResults.map(r => [r.match_id, r]))
+
+  for (const g of GROUPS) {
+    const gMatchesResults: GroupMatch[] = []
+    let complete = true
+
+    for (const m of groupMatches.filter(x => x.group === g.id)) {
+      const res = resultsMap.get(m.id)
+      if (!res || res.home_score == null || res.away_score == null) {
+        complete = false
+        break
+      }
+      gMatchesResults.push({ match: m, home: res.home_score, away: res.away_score })
+    }
+
+    if (complete) {
+      const standing = computeGroupStandings(g.teams, gMatchesResults)
+      if (standing) {
+        for (const row of standing) {
+          standingsUpserts.push({
+            group_id: g.id,
+            position: row.position,
+            team: row.team,
+            finalized: true,
+          })
+        }
+      }
+    }
+  }
+
+  if (standingsUpserts.length > 0) {
+    const { error: standingsError } = await admin
+      .from('group_standings')
+      .upsert(standingsUpserts, { onConflict: 'group_id,position' })
+
+    if (standingsError) return { error: 'Error al actualizar posiciones de grupo: ' + standingsError.message }
+  }
+
+  // Audit log
+  await admin.from('audit_log').insert({
+    actor_id: user.id,
+    action: 'random_results_generated',
+    target_type: 'result',
+    meta: {
+      count: updatedResults.length,
+    },
+  })
+
+  // 4. Recalcular todos los puntos de las predicciones
+  const recalculated = await recalcAllPoints(admin)
+
+  revalidatePath('/admin/resultados')
+  revalidatePath('/ranking')
+
   return { ok: true, recalculated }
 }
