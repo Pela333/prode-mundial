@@ -426,10 +426,11 @@ export default function RulesDashboard() {
                       <select
                         value={predPenWinner}
                         onChange={e => setPredPenWinner(e.target.value as any)}
+                        style={{ colorScheme: 'dark' }}
                         className="w-full bg-[#0a0f1e] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500 cursor-pointer"
                       >
-                        <option value="home">Equipo Local</option>
-                        <option value="away">Equipo Visitante</option>
+                        <option value="home" className="bg-[#0a0f1e] text-white">Equipo Local</option>
+                        <option value="away" className="bg-[#0a0f1e] text-white">Equipo Visitante</option>
                       </select>
                     </div>
                   )}
@@ -473,10 +474,11 @@ export default function RulesDashboard() {
                       <select
                         value={realPenWinner}
                         onChange={e => setRealPenWinner(e.target.value as any)}
+                        style={{ colorScheme: 'dark' }}
                         className="w-full bg-[#0a0f1e] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-green-500 cursor-pointer"
                       >
-                        <option value="home">Equipo Local</option>
-                        <option value="away">Equipo Visitante</option>
+                        <option value="home" className="bg-[#0a0f1e] text-white">Equipo Local</option>
+                        <option value="away" className="bg-[#0a0f1e] text-white">Equipo Visitante</option>
                       </select>
                     </div>
                   )}

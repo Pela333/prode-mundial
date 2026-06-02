@@ -164,11 +164,12 @@ export default function BracketEditor({ slotsByPhase, bracketMap, teams }: Brack
                           id={`bracket-${slot.id}-home`}
                           value={state?.homeTeam ?? ''}
                           onChange={e => handleChange(slot.id, 'homeTeam', e.target.value)}
+                          style={{ colorScheme: 'dark' }}
                           className="w-full appearance-none bg-slate-900 border border-white/8 text-white text-sm rounded-xl px-3 py-2 pr-8 focus:outline-none focus:border-amber-500/40 transition-colors"
                         >
-                          <option value="">— Equipo —</option>
+                          <option value="" className="bg-slate-900 text-white">— Equipo —</option>
                           {teams.map(t => (
-                            <option key={t} value={t}>{t}</option>
+                            <option key={t} value={t} className="bg-slate-900 text-white">{t}</option>
                           ))}
                         </select>
                         <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
@@ -183,11 +184,12 @@ export default function BracketEditor({ slotsByPhase, bracketMap, teams }: Brack
                           id={`bracket-${slot.id}-away`}
                           value={state?.awayTeam ?? ''}
                           onChange={e => handleChange(slot.id, 'awayTeam', e.target.value)}
+                          style={{ colorScheme: 'dark' }}
                           className="w-full appearance-none bg-slate-900 border border-white/8 text-white text-sm rounded-xl px-3 py-2 pr-8 focus:outline-none focus:border-amber-500/40 transition-colors"
                         >
-                          <option value="">— Equipo —</option>
+                          <option value="" className="bg-slate-900 text-white">— Equipo —</option>
                           {teams.map(t => (
-                            <option key={t} value={t}>{t}</option>
+                            <option key={t} value={t} className="bg-slate-900 text-white">{t}</option>
                           ))}
                         </select>
                         <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />

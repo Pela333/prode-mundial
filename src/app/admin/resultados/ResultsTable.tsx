@@ -264,11 +264,12 @@ function EditModal({ row, onClose }: { row: ResultRow; onClose: () => void }) {
             <select
               value={status}
               onChange={e => setStatus(e.target.value as ResultRow['status'])}
-              className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm outline-none focus:border-amber-500/60 [color-scheme:dark]"
+              style={{ colorScheme: 'dark' }}
+              className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-white text-sm outline-none focus:border-amber-500/60"
             >
-              <option value="scheduled">Programado</option>
-              <option value="in_progress">En curso</option>
-              <option value="finished">Finalizado</option>
+              <option value="scheduled" className="bg-[#111827] text-white">Programado</option>
+              <option value="in_progress" className="bg-[#111827] text-white">En curso</option>
+              <option value="finished" className="bg-[#111827] text-white">Finalizado</option>
             </select>
           </div>
 
