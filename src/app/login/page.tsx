@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Trophy, Mail, Lock, User, Phone, IdCard, Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { signupAction, loginAction } from './actions'
 import type { FieldErrors } from '@/lib/validation'
+import LogoBadge from '@/components/LogoBadge'
 
 type Mode = 'login' | 'register'
 
@@ -213,6 +214,15 @@ export default function LoginPage() {
               {mode === 'login' ? 'Entrar al prode' : 'Crear cuenta'}
             </button>
           </form>
+
+          <div className="mt-6 pt-5 border-t border-white/5 text-center space-y-2 select-none">
+            <p className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Organizado por</p>
+            <div className="flex items-center justify-center gap-3">
+              <LogoBadge src="/logo-empresa.png" alt="Empresa" fallbackText="EMPRESA" bgGradient="from-amber-500 to-amber-600" />
+              <span className="text-slate-650 text-xs font-bold">×</span>
+              <LogoBadge src="/logo-socia.png" alt="Socia" fallbackText="SOCIA" bgGradient="from-sky-500 to-indigo-600" />
+            </div>
+          </div>
         </div>
 
         <p className="text-center text-xs text-slate-600 mt-4">

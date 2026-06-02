@@ -85,7 +85,11 @@ export default function ElimMatchCard(props: ElimMatchCardProps) {
   }, [])
 
   function handleScore(setter: (v: string) => void, val: string) {
-    const n = val.replace(/\D/g, '').slice(0, 2)
+    let clean = val.replace(/\D/g, '')
+    if (clean.length > 1 && clean.startsWith('0')) {
+      clean = String(parseInt(clean, 10))
+    }
+    const n = clean.slice(0, 2)
     setter(n)
     setError(null)
     setSavedMark(false)
@@ -150,7 +154,7 @@ export default function ElimMatchCard(props: ElimMatchCardProps) {
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             <input
-              type="number" inputMode="numeric" min={0} max={99}
+              type="text" inputMode="numeric"
               value={home}
               onChange={e => handleScore(setHome, e.target.value)}
               onBlur={() => persist(home, away, penWinner)}
@@ -161,7 +165,7 @@ export default function ElimMatchCard(props: ElimMatchCardProps) {
             />
             <span className="text-slate-600 text-sm select-none">:</span>
             <input
-              type="number" inputMode="numeric" min={0} max={99}
+              type="text" inputMode="numeric"
               value={away}
               onChange={e => handleScore(setAway, e.target.value)}
               onBlur={() => persist(home, away, penWinner)}

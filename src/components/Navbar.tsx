@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { Trophy, LayoutGrid, LogOut, User, Menu, X, ShieldCheck, Swords, BookOpen } from 'lucide-react'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import LogoBadge from './LogoBadge'
 
 interface NavbarProps {
   username?: string | null
@@ -38,14 +39,21 @@ export default function Navbar({ username, role }: NavbarProps) {
   return (
     <header className="sticky top-0 z-50 border-b border-white/5 bg-[#0a0f1e]/80 backdrop-blur-xl">
       <div className="mx-auto max-w-6xl px-4 flex items-center justify-between h-16">
-        <Link href="/prode" className="flex items-center gap-2 group">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-red-500 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-            <Trophy size={16} className="text-white" />
+        <div className="flex items-center gap-3">
+          <Link href="/prode" className="flex items-center gap-2 group">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-red-500 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+              <Trophy size={16} className="text-white" />
+            </div>
+            <span className="font-bold text-white text-lg tracking-tight hidden sm:block">
+              Prode <span className="text-amber-400">2026</span>
+            </span>
+          </Link>
+          <div className="flex items-center gap-1.5 border-l border-white/10 pl-3 select-none">
+            <LogoBadge src="/logo-empresa.png" alt="Empresa" fallbackText="EMPRESA" bgGradient="from-amber-500 to-amber-600" />
+            <span className="text-slate-650 text-[10px] font-bold">×</span>
+            <LogoBadge src="/logo-socia.png" alt="Socia" fallbackText="SOCIA" bgGradient="from-sky-500 to-indigo-600" />
           </div>
-          <span className="font-bold text-white text-lg tracking-tight hidden sm:block">
-            Prode <span className="text-amber-400">2026</span>
-          </span>
-        </Link>
+        </div>
 
         <nav className="hidden md:flex items-center gap-1">
           {links.map(({ href, label, icon: Icon }) => {

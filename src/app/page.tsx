@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { Trophy, Users, Star, ChevronRight } from 'lucide-react'
+import LogoBadge from '@/components/LogoBadge'
 
 export default async function HomePage() {
   const supabase = await createClient()
@@ -48,6 +49,15 @@ export default async function HomePage() {
           Entrar al prode
           <ChevronRight size={18} className="group-hover:translate-x-0.5 transition-transform" />
         </Link>
+
+        <div className="mt-12 pt-6 border-t border-white/5 space-y-2 select-none">
+          <p className="text-[10px] uppercase font-bold tracking-widest text-slate-500">Organizado por</p>
+          <div className="flex items-center justify-center gap-3">
+            <LogoBadge src="/logo-empresa.png" alt="Empresa" fallbackText="EMPRESA" bgGradient="from-amber-500 to-amber-600" />
+            <span className="text-slate-650 text-xs font-bold">×</span>
+            <LogoBadge src="/logo-socia.png" alt="Socia" fallbackText="SOCIA" bgGradient="from-sky-500 to-indigo-600" />
+          </div>
+        </div>
       </div>
     </div>
   )

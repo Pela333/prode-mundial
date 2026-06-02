@@ -54,7 +54,11 @@ export default function MatchCard({
   }, [home, away])
 
   function handleInput(setter: (v: string) => void, val: string) {
-    const n = val.replace(/\D/g, '').slice(0, 2)
+    let clean = val.replace(/\D/g, '')
+    if (clean.length > 1 && clean.startsWith('0')) {
+      clean = String(parseInt(clean, 10))
+    }
+    const n = clean.slice(0, 2)
     setter(n)
     setError(null)
     setSavedMark(false)
@@ -153,10 +157,8 @@ export default function MatchCard({
 
         <div className="flex items-center gap-2 shrink-0">
           <input
-            type="number"
+            type="text"
             inputMode="numeric"
-            min={0}
-            max={99}
             value={home}
             onChange={e => handleInput(setHome, e.target.value)}
             onBlur={() => persist(home, away)}
@@ -168,10 +170,8 @@ export default function MatchCard({
           />
           <span className="text-slate-600 font-bold text-lg select-none">:</span>
           <input
-            type="number"
+            type="text"
             inputMode="numeric"
-            min={0}
-            max={99}
             value={away}
             onChange={e => handleInput(setAway, e.target.value)}
             onBlur={() => persist(home, away)}

@@ -18,26 +18,40 @@ import {
   ChevronRight
 } from 'lucide-react'
 
+function cleanScoreInput(val: string): string {
+  let clean = val.replace(/\D/g, '')
+  if (clean.length > 1 && clean.startsWith('0')) {
+    clean = String(parseInt(clean, 10))
+  }
+  return clean.slice(0, 2)
+}
+
+
 export default function RulesDashboard() {
   const [activeTab, setActiveTab] = useState<'grupos' | 'eliminatorias' | 'podio' | 'simulador'>('grupos')
 
   // Estado del simulador
   const [simPhase, setSimPhase] = useState<'groups' | 'knockout'>('groups')
-  const [predHome, setPredHome] = useState<number>(2)
-  const [predAway, setPredAway] = useState<number>(1)
-  const [realHome, setRealHome] = useState<number>(2)
-  const [realAway, setRealAway] = useState<number>(1)
+  const [predHome, setPredHome] = useState<string>('2')
+  const [predAway, setPredAway] = useState<string>('1')
+  const [realHome, setRealHome] = useState<string>('2')
+  const [realAway, setRealAway] = useState<string>('1')
   const [predPenWinner, setPredPenWinner] = useState<'home' | 'away'>('home')
   const [realPenWinner, setRealPenWinner] = useState<'home' | 'away'>('home')
   const [groupPosBonus, setGroupPosBonus] = useState<boolean>(false)
 
   // Cálculo de puntos del simulador
-  const predDiff = predHome - predAway
-  const realDiff = realHome - realAway
+  const valPredHome = parseInt(predHome, 10) || 0
+  const valPredAway = parseInt(predAway, 10) || 0
+  const valRealHome = parseInt(realHome, 10) || 0
+  const valRealAway = parseInt(realAway, 10) || 0
+
+  const predDiff = valPredHome - valPredAway
+  const realDiff = valRealHome - valRealAway
   const predOutcome = predDiff > 0 ? 'home' : predDiff < 0 ? 'away' : 'draw'
   const realOutcome = realDiff > 0 ? 'home' : realDiff < 0 ? 'away' : 'draw'
 
-  const isExact = predHome === realHome && predAway === realAway
+  const isExact = valPredHome === valRealHome && valPredAway === valRealAway
   const isOutcome = predOutcome === realOutcome
 
   let simPoints = 0
@@ -380,14 +394,14 @@ export default function RulesDashboard() {
                     <div className="text-xs font-bold text-amber-400 uppercase tracking-wider text-center border-b border-white/5 pb-2">
                       Tu Pronóstico
                     </div>
-                    <div className="flex items-center justify-center gap-2 mt-4">
+                      <div className="flex items-center justify-center gap-2 mt-4">
                       <div className="flex flex-col items-center">
                         <span className="text-xs text-slate-500 mb-1">Local</span>
                         <input
-                          type="number"
-                          min="0"
+                          type="text"
+                          inputMode="numeric"
                           value={predHome}
-                          onChange={e => setPredHome(Math.max(0, parseInt(e.target.value) || 0))}
+                          onChange={e => setPredHome(cleanScoreInput(e.target.value))}
                           className="w-12 h-12 text-center text-lg font-bold rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-amber-500 score-input"
                         />
                       </div>
@@ -395,10 +409,10 @@ export default function RulesDashboard() {
                       <div className="flex flex-col items-center">
                         <span className="text-xs text-slate-500 mb-1">Visita</span>
                         <input
-                          type="number"
-                          min="0"
+                          type="text"
+                          inputMode="numeric"
                           value={predAway}
-                          onChange={e => setPredAway(Math.max(0, parseInt(e.target.value) || 0))}
+                          onChange={e => setPredAway(cleanScoreInput(e.target.value))}
                           className="w-12 h-12 text-center text-lg font-bold rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-amber-500 score-input"
                         />
                       </div>
@@ -431,10 +445,10 @@ export default function RulesDashboard() {
                       <div className="flex flex-col items-center">
                         <span className="text-xs text-slate-500 mb-1">Local</span>
                         <input
-                          type="number"
-                          min="0"
+                          type="text"
+                          inputMode="numeric"
                           value={realHome}
-                          onChange={e => setRealHome(Math.max(0, parseInt(e.target.value) || 0))}
+                          onChange={e => setRealHome(cleanScoreInput(e.target.value))}
                           className="w-12 h-12 text-center text-lg font-bold rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-green-500 score-input"
                         />
                       </div>
@@ -442,10 +456,10 @@ export default function RulesDashboard() {
                       <div className="flex flex-col items-center">
                         <span className="text-xs text-slate-500 mb-1">Visita</span>
                         <input
-                          type="number"
-                          min="0"
+                          type="text"
+                          inputMode="numeric"
                           value={realAway}
-                          onChange={e => setRealAway(Math.max(0, parseInt(e.target.value) || 0))}
+                          onChange={e => setRealAway(cleanScoreInput(e.target.value))}
                           className="w-12 h-12 text-center text-lg font-bold rounded-xl bg-white/5 border border-white/10 text-white focus:outline-none focus:border-green-500 score-input"
                         />
                       </div>

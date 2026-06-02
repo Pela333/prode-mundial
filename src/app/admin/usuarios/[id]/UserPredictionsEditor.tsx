@@ -297,12 +297,20 @@ function EditModal({
             </label>
             <div className="flex items-center gap-2">
               <span className="text-sm text-white truncate flex-1 text-right">{state.homeTeam}</span>
-              <input type="number" min={0} max={99} value={home}
-                onChange={e => setHome(e.target.value.replace(/\D/g, '').slice(0, 2))}
+              <input type="text" inputMode="numeric" value={home}
+                onChange={e => {
+                  let clean = e.target.value.replace(/\D/g, '')
+                  if (clean.length > 1 && clean.startsWith('0')) clean = String(parseInt(clean, 10))
+                  setHome(clean.slice(0, 2))
+                }}
                 className="score-input w-14 h-10 text-center text-lg font-bold rounded-lg border-2 bg-white/5 text-white border-white/10 focus:border-amber-500 outline-none" />
               <span className="text-slate-600">:</span>
-              <input type="number" min={0} max={99} value={away}
-                onChange={e => setAway(e.target.value.replace(/\D/g, '').slice(0, 2))}
+              <input type="text" inputMode="numeric" value={away}
+                onChange={e => {
+                  let clean = e.target.value.replace(/\D/g, '')
+                  if (clean.length > 1 && clean.startsWith('0')) clean = String(parseInt(clean, 10))
+                  setAway(clean.slice(0, 2))
+                }}
                 className="score-input w-14 h-10 text-center text-lg font-bold rounded-lg border-2 bg-white/5 text-white border-white/10 focus:border-amber-500 outline-none" />
               <span className="text-sm text-white truncate flex-1">{state.awayTeam}</span>
             </div>
