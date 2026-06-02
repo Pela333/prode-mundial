@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import Navbar from '@/components/Navbar'
 import { Trophy, Star, Send } from 'lucide-react'
@@ -122,15 +123,15 @@ export default async function RankingPage() {
                   {tied && <span className="text-slate-600 ml-0.5" title="Empate técnico">⇄</span>}
                 </span>
 
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-700 to-slate-600 flex items-center justify-center text-white text-sm font-bold shrink-0">
+                <Link href={`/ranking/usuarios/${r.user_id}`} className="flex items-center gap-2 min-w-0 group/player">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-700 to-slate-600 flex items-center justify-center text-white text-sm font-bold shrink-0 group-hover/player:scale-105 transition-transform">
                     {r.first_name?.[0]?.toUpperCase()}
                   </div>
-                  <span className={`text-sm font-medium truncate ${isMe ? 'text-amber-400' : 'text-white'}`}>
+                  <span className={`text-sm font-medium truncate group-hover/player:text-amber-400 transition-colors ${isMe ? 'text-amber-400' : 'text-white'}`}>
                     {r.first_name} {r.last_name}
                     {isMe && <span className="text-xs text-amber-500 ml-1">(vos)</span>}
                   </span>
-                </div>
+                </Link>
 
                 <span className="text-right" title="Estado de envíos">
                   <Send
