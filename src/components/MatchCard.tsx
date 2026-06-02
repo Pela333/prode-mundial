@@ -129,17 +129,17 @@ export default function MatchCard({
     if (points === null || points === undefined) return null
     const tooltip = getTooltip()
     if (points >= 3) return (
-      <span title={tooltip} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-400/10 text-amber-400 border border-amber-400/20 cursor-help">
+      <span title={tooltip} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-400/10 text-amber-400 border border-amber-400/20">
         +{points} exacto
       </span>
     )
     if (points >= 1) return (
-      <span title={tooltip} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-green-400/10 text-green-400 border border-green-400/20 cursor-help">
+      <span title={tooltip} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-green-400/10 text-green-400 border border-green-400/20">
         +{points} pt
       </span>
     )
     return (
-      <span title={tooltip} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-slate-700/40 text-slate-500 border border-slate-700/40 cursor-help">
+      <span title={tooltip} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-slate-700/40 text-slate-500 border border-slate-700/40">
         0 pts
       </span>
     )

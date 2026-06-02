@@ -267,7 +267,7 @@ function Row({
         {isElim && real?.went_to_pens && real.pen_winner && <span className="text-amber-400 ml-1">/{real.pen_winner.slice(0, 3)}</span>}
       </span>
       {pts != null ? (
-        <span title={tooltip} className={`text-xs font-bold w-10 text-right cursor-help ${pts >= 3 ? 'text-amber-400' : pts > 0 ? 'text-green-400' : 'text-slate-600'}`}>
+        <span title={tooltip} className={`text-xs font-bold w-10 text-right ${pts >= 3 ? 'text-amber-400' : pts > 0 ? 'text-green-400' : 'text-slate-600'}`}>
           {pts > 0 ? `+${pts}` : '0'}
         </span>
       ) : <span className="w-10" />}

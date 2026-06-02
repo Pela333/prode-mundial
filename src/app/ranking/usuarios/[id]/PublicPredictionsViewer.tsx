@@ -232,7 +232,7 @@ function Row({
       </span>
       <div className="w-12 text-right">
         {pts != null ? (
-          <span title={tooltip} className={`text-xs font-bold px-2 py-0.5 rounded-full cursor-help ${
+          <span title={tooltip} className={`text-xs font-bold px-2 py-0.5 rounded-full ${
             pts >= 3
               ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
               : pts > 0

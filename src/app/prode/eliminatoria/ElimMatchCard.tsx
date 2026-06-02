@@ -160,17 +160,17 @@ export default function ElimMatchCard(props: ElimMatchCardProps) {
     if (props.points === null || props.points === undefined) return null
     const tooltip = getTooltip()
     if (props.points >= 3) return (
-      <span title={tooltip} className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-400/10 text-amber-400 border border-amber-400/20 cursor-help">
+      <span title={tooltip} className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-400/10 text-amber-400 border border-amber-400/20">
         +{props.points}
       </span>
     )
     if (props.points >= 1) return (
-      <span title={tooltip} className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-400/10 text-green-400 border border-green-400/20 cursor-help">
+      <span title={tooltip} className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-400/10 text-green-400 border border-green-400/20">
         +{props.points}
       </span>
     )
     return (
-      <span title={tooltip} className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-700/40 text-slate-500 border border-slate-700/40 cursor-help">
+      <span title={tooltip} className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-700/40 text-slate-500 border border-slate-700/40">
         0 pts
       </span>
     )
