@@ -16,9 +16,8 @@ export default async function HomePage() {
       </div>
 
       <div className="relative max-w-md animate-fade-in-up">
-        <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-amber-500 to-red-500 flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-amber-500/30">
-          <Trophy size={40} className="text-white" />
-        </div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/messi.png" alt="Prode" className="w-20 h-20 object-contain rounded-3xl mx-auto mb-6 shadow-2xl shadow-amber-500/20" />
 
         <h1 className="text-4xl font-black text-white mb-3">
           Prode <span className="text-amber-400">Mundial 2026</span>

@@ -71,9 +71,8 @@ export default function LoginPage() {
 
       <div className="relative w-full max-w-sm animate-fade-in-up">
         <div className="text-center mb-6">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-red-500 flex items-center justify-center mx-auto mb-4 shadow-xl shadow-amber-500/20">
-            <Trophy size={32} className="text-white" />
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/messi.png" alt="Prode" className="w-16 h-16 object-contain rounded-2xl mx-auto mb-4 shadow-xl shadow-amber-500/10" />
           <h1 className="text-2xl font-bold text-white">Prode Mundial 2026</h1>
           <p className="text-slate-400 text-sm mt-1">Competí con tus amigos</p>
         </div>
