@@ -74,7 +74,7 @@ export default function LoginPage() {
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/messi.png" alt="Prode" className="w-28 h-28 object-contain rounded-2xl mx-auto mb-4 shadow-xl shadow-amber-500/10" />
           <h1 className="text-2xl font-bold text-white">Prode Mundial 2026</h1>
-          <p className="text-slate-400 text-sm mt-1">Competí con tus amigos</p>
+          <p className="text-slate-400 text-sm mt-1">Competí y ganá</p>
         </div>
 
         <div className="rounded-2xl bg-[#111827] border border-white/8 p-6 shadow-2xl">

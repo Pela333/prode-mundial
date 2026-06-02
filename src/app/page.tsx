@@ -31,7 +31,7 @@ export default async function HomePage() {
             { icon: Star, label: '3 puntos', desc: 'resultado exacto', color: 'text-amber-400' },
             { icon: Trophy, label: '1 punto', desc: 'ganador correcto', color: 'text-green-400' },
             { icon: Users, label: '48 equipos', desc: '12 grupos · 72 partidos', color: 'text-sky-400' },
-            { icon: Trophy, label: 'Ranking en vivo', desc: 'competí con amigos', color: 'text-purple-400' },
+            { icon: Trophy, label: 'Ranking en vivo', desc: 'competí y ganá', color: 'text-purple-400' },
           ].map(({ icon: Icon, label, desc, color }) => (
             <div key={label} className="rounded-xl bg-white/3 border border-white/6 p-3">
               <Icon size={16} className={`${color} mb-1.5`} />

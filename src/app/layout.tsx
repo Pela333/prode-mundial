@@ -6,10 +6,10 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
   title: "Prode Mundial 2026",
-  description: "Predecí los resultados del Mundial 2026 y competí con tus amigos",
+  description: "Predecí los resultados del Mundial 2026, sumá puntos y ganá",
   openGraph: {
     title: "Prode Mundial 2026",
-    description: "Predecí los resultados del Mundial 2026 y competí con tus amigos",
+    description: "Predecí los resultados del Mundial 2026, sumá puntos y ganá",
   },
 };
 
