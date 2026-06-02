@@ -49,9 +49,9 @@ export default function Navbar({ username, role }: NavbarProps) {
             </span>
           </Link>
           <div className="flex items-center gap-1.5 border-l border-white/10 pl-3 select-none">
-            <LogoBadge src="/logo-empresa.png" alt="Empresa" fallbackText="EMPRESA" bgGradient="from-amber-500 to-amber-600" />
+            <LogoBadge src="/logo-empresa.png" alt="Empresa" fallbackText="EMPRESA" bgGradient="from-amber-500 to-amber-600" heightClass="h-8" />
             <span className="text-slate-650 text-[10px] font-bold">×</span>
-            <LogoBadge src="/logo-socia.png" alt="Socia" fallbackText="SOCIA" bgGradient="from-sky-500 to-indigo-600" />
+            <LogoBadge src="/logo-socia.png" alt="Socia" fallbackText="SOCIA" bgGradient="from-sky-500 to-indigo-600" heightClass="h-6" />
           </div>
         </div>
 
