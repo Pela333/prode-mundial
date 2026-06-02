@@ -72,7 +72,7 @@ export default function LoginPage() {
       <div className="relative w-full max-w-sm animate-fade-in-up">
         <div className="text-center mb-6">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/messi.png" alt="Prode" className="w-28 h-28 object-contain rounded-2xl mx-auto mb-4 shadow-xl shadow-amber-500/10" />
+          <img src="/messi.png" alt="Prode" className="w-28 h-28 object-contain mx-auto mb-4 filter drop-shadow-[0_8px_16px_rgba(245,158,11,0.1)]" />
           <h1 className="text-2xl font-bold text-white">Prode Mundial 2026</h1>
           <p className="text-slate-400 text-sm mt-1">Competí y ganá</p>
         </div>

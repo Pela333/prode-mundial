@@ -39,22 +39,26 @@ export default function Navbar({ username, role }: NavbarProps) {
   return (
     <header className="sticky top-0 z-50 border-b border-white/5 bg-[#0a0f1e]/80 backdrop-blur-xl">
       <div className="mx-auto max-w-6xl px-4 flex items-center justify-between h-16">
-        <div className="flex items-center gap-3">
-          <Link href="/prode" className="flex items-center gap-2 group">
+        <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+          <Link href="/prode" className="flex items-center gap-2 shrink-0 group">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/messi.png" alt="Prode" className="w-12 h-12 object-contain rounded-lg shadow-lg group-hover:scale-105 transition-transform" />
-            <span className="font-bold text-white text-lg tracking-tight hidden sm:block">
+            <img 
+              src="/messi.png" 
+              alt="Prode" 
+              className="w-12 h-12 object-contain shrink-0 group-hover:scale-105 transition-transform" 
+            />
+            <span className="font-bold text-white text-lg tracking-tight hidden sm:block whitespace-nowrap shrink-0">
               Prode <span className="text-amber-400">2026</span>
             </span>
           </Link>
-          <div className="flex items-center gap-1.5 border-l border-white/10 pl-3 select-none">
+          <div className="flex items-center gap-1.5 border-l border-white/10 pl-3 select-none shrink-0">
             <LogoBadge src="/logo-empresa.png" alt="Empresa" fallbackText="EMPRESA" bgGradient="from-amber-500 to-amber-600" heightClass="h-8" />
-            <span className="text-slate-650 text-[10px] font-bold">×</span>
+            <span className="text-slate-500 text-[10px] font-bold">×</span>
             <LogoBadge src="/logo-socia.png" alt="Socia" fallbackText="SOCIA" bgGradient="from-sky-500 to-indigo-600" heightClass="h-6" />
           </div>
         </div>
 
-        <nav className="hidden md:flex items-center gap-1">
+        <nav className="hidden lg:flex items-center gap-1">
           {links.map(({ href, label, icon: Icon }) => {
             // /prode debe ser exacto (no matchear /prode/eliminatoria)
             const active = href === '/prode'
@@ -77,7 +81,7 @@ export default function Navbar({ username, role }: NavbarProps) {
           })}
         </nav>
 
-        <div className="hidden md:flex items-center gap-3">
+        <div className="hidden lg:flex items-center gap-3">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
             <User size={14} className="text-slate-400" />
             <span className="text-sm font-medium text-slate-300">{username ?? 'Usuario'}</span>
@@ -92,7 +96,7 @@ export default function Navbar({ username, role }: NavbarProps) {
         </div>
 
         <button
-          className="md:hidden text-slate-400 hover:text-white p-2"
+          className="lg:hidden text-slate-400 hover:text-white p-2"
           onClick={() => setOpen(!open)}
           aria-label="Menú"
         >
@@ -101,7 +105,7 @@ export default function Navbar({ username, role }: NavbarProps) {
       </div>
 
       {open && (
-        <div className="md:hidden border-t border-white/5 bg-[#0a0f1e] px-4 py-3 space-y-1 animate-fade-in-up">
+        <div className="lg:hidden border-t border-white/5 bg-[#0a0f1e] px-4 py-3 space-y-1 animate-fade-in-up">
           {links.map(({ href, label, icon: Icon }) => {
             // /prode debe ser exacto (no matchear /prode/eliminatoria)
             const active = href === '/prode'

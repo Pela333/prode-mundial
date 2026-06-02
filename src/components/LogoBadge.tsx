@@ -33,7 +33,7 @@ export default function LogoBadge({
       src={src}
       alt={alt}
       onError={() => setError(true)}
-      className={`${heightClass} object-contain max-w-[100px] transition-all`}
+      className={`${heightClass} object-contain max-w-[100px] transition-all shrink-0`}
     />
   )
 }
