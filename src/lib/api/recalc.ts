@@ -261,6 +261,7 @@ export async function recalcPointsForMatch(supabase: SupabaseClient, matchId: st
 
   for (const p of predictions as PredictionRow[]) {
     let result_points = 0
+    let predWinner: string | null = null
 
     if (p.phase === 'group') {
       result_points = pointsForResult(
@@ -278,6 +279,16 @@ export async function recalcPointsForMatch(supabase: SupabaseClient, matchId: st
         bracketRow.home_team, bracketRow.away_team, r.home_score_120, r.away_score_120,
         r.went_to_pens, r.pen_winner
       )
+
+      if (predHomeTeam && predAwayTeam && p.home_score_120 != null && p.away_score_120 != null) {
+        if (p.home_score_120 > p.away_score_120) {
+          predWinner = predHomeTeam
+        } else if (p.home_score_120 < p.away_score_120) {
+          predWinner = predAwayTeam
+        } else {
+          predWinner = p.pen_winner
+        }
+      }
     }
 
     let bonus_points = 0
@@ -287,8 +298,8 @@ export async function recalcPointsForMatch(supabase: SupabaseClient, matchId: st
       bonus_points += 1
     }
 
-    // Bonus posicionamiento elim: ganador real estuvo en esa misma posición de grupo en el pronóstico del usuario
-    if (p.phase !== 'group' && winnerTeam && realPos != null && userGroupStandings) {
+    // Bonus posicionamiento elim: ganador real estuvo en esa misma posición de grupo en el pronóstico del usuario Y el usuario predijo que ese equipo ganaba
+    if (p.phase !== 'group' && winnerTeam && realPos != null && userGroupStandings && predWinner === winnerTeam) {
       const userPositions = userGroupStandings.get(p.user_id)
       if (userPositions) {
         const userPos = userPositions.get(winnerTeam)
@@ -573,7 +584,23 @@ export async function recalcPointsForUser(supabase: SupabaseClient, userId: stri
         }
       }
 
-      if (winnerTeam) {
+      let predWinner: string | null = null
+      if (userBrackets) {
+        const userBracket = userBrackets.get(userId)
+        const predHomeTeam = userBracket?.get(p.match_id)?.home ?? null
+        const predAwayTeam = userBracket?.get(p.match_id)?.away ?? null
+        if (predHomeTeam && predAwayTeam && p.home_score_120 != null && p.away_score_120 != null) {
+          if (p.home_score_120 > p.away_score_120) {
+            predWinner = predHomeTeam
+          } else if (p.home_score_120 < p.away_score_120) {
+            predWinner = predAwayTeam
+          } else {
+            predWinner = p.pen_winner
+          }
+        }
+      }
+
+      if (winnerTeam && predWinner === winnerTeam) {
         const realPos = realPosMap.get(winnerTeam)
         const userPositions = userGroupStandings.get(userId)
         if (realPos != null && userPositions) {
