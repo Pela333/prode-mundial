@@ -75,9 +75,88 @@ function pointsForResult(
   return 0
 }
 
+function pointsForElimMatch(
+  predHomeTeam: string | null,
+  predAwayTeam: string | null,
+  predHomeScore: number | null,
+  predAwayScore: number | null,
+  predPenWinner: string | null,
+  realHomeTeam: string | null,
+  realAwayTeam: string | null,
+  realHomeScore: number | null,
+  realAwayScore: number | null,
+  realWentToPens: boolean,
+  realPenWinner: string | null
+): number {
+  if (
+    !predHomeTeam || !predAwayTeam || predHomeScore == null || predAwayScore == null ||
+    !realHomeTeam || !realAwayTeam || realHomeScore == null || realAwayScore == null
+  ) {
+    return 0
+  }
+
+  // Determine predicted winner
+  let predWinner: string
+  let predWinnerScore: number
+  let predLoserScore: number
+  const predIsDraw = predHomeScore === predAwayScore
+  if (predHomeScore > predAwayScore) {
+    predWinner = predHomeTeam
+    predWinnerScore = predHomeScore
+    predLoserScore = predAwayScore
+  } else if (predHomeScore < predAwayScore) {
+    predWinner = predAwayTeam
+    predWinnerScore = predAwayScore
+    predLoserScore = predHomeScore
+  } else {
+    if (!predPenWinner) return 0
+    predWinner = predPenWinner
+    predWinnerScore = predHomeScore
+    predLoserScore = predAwayScore
+  }
+
+  // Determine real winner
+  let realWinner: string
+  let realWinnerScore: number
+  let realLoserScore: number
+  const realIsDraw = realHomeScore === realAwayScore
+  if (realWentToPens && realPenWinner) {
+    realWinner = realPenWinner
+    realWinnerScore = realHomeScore
+    realLoserScore = realAwayScore
+  } else {
+    if (realHomeScore > realAwayScore) {
+      realWinner = realHomeTeam
+      realWinnerScore = realHomeScore
+      realLoserScore = realAwayScore
+    } else {
+      realWinner = realAwayTeam
+      realWinnerScore = realAwayScore
+      realLoserScore = realHomeScore
+    }
+  }
+
+  // If the predicted winner doesn't match the real winner: 0 points
+  if (predWinner !== realWinner) {
+    return 0
+  }
+
+  // If predicted 120' outcome (draw or win) doesn't match real 120' outcome: 0 points
+  if (predIsDraw !== realIsDraw) {
+    return 0
+  }
+
+  // If they match, check if exact score of winner and loser match
+  if (predWinnerScore === realWinnerScore && predLoserScore === realLoserScore) {
+    return 3
+  }
+
+  return 1
+}
+
 /**
  * Recalcula puntos de TODAS las predictions del partido dado.
- * Retorna el número de filas actualizadas.
+ * Retorna el número de filos actualizadas.
  */
 export async function recalcPointsForMatch(supabase: SupabaseClient, matchId: string): Promise<number> {
   const { data: result } = await supabase
@@ -105,27 +184,31 @@ export async function recalcPointsForMatch(supabase: SupabaseClient, matchId: st
   // Sólo aplica si phase !== 'group'.
   let winnerTeam: string | null = null
   let userGroupStandings: Map<string, Map<string, number>> | null = null
+  let userBrackets: Map<string, Map<string, { home: string | null; away: string | null }>> | null = null
   let realPos: number | null = null
+  let bracketRow: { home_team: string | null; away_team: string | null } | null = null
 
   if (r.phase !== 'group') {
-    // Quién ganó realmente? Si fue a penales, pen_winner; si no, comparar 120'
-    if (r.went_to_pens && r.pen_winner) {
-      winnerTeam = r.pen_winner
-    } else if (r.home_score_120 != null && r.away_score_120 != null) {
-      // Necesitamos saber qué equipo fue local y cuál visitante para este partido elim
-      const { data: bracketRow } = await supabase
-        .from('bracket').select('home_team, away_team').eq('match_id', matchId).maybeSingle()
-      if (bracketRow) {
+    const { data: bRow } = await supabase
+      .from('bracket').select('home_team, away_team').eq('match_id', matchId).maybeSingle()
+    bracketRow = bRow
+
+    if (bracketRow) {
+      // Quién ganó realmente? Si fue a penales, pen_winner; si no, comparar 120'
+      if (r.went_to_pens && r.pen_winner) {
+        winnerTeam = r.pen_winner
+      } else if (r.home_score_120 != null && r.away_score_120 != null) {
         if (r.home_score_120 > r.away_score_120) winnerTeam = bracketRow.home_team
         else if (r.home_score_120 < r.away_score_120) winnerTeam = bracketRow.away_team
       }
     }
 
-    if (winnerTeam) {
-      // Cargamos las predicciones de fase de grupos de TODOS los usuarios afectados
-      const userIds = [...new Set((predictions as PredictionRow[]).map(p => p.user_id))]
-      userGroupStandings = await computeUserStandingsBatch(supabase, userIds)
+    // Cargamos las predicciones de fase de grupos de TODOS los usuarios afectados
+    const userIds = [...new Set((predictions as PredictionRow[]).map(p => p.user_id))]
+    userGroupStandings = await computeUserStandingsBatch(supabase, userIds)
+    userBrackets = await computeUserBracketsBatch(supabase, userIds)
 
+    if (winnerTeam) {
       // Cargar la posición real del ganador en group_standings
       const { data: realStanding } = await supabase
         .from('group_standings')
@@ -141,11 +224,25 @@ export async function recalcPointsForMatch(supabase: SupabaseClient, matchId: st
   const updates: { id: string; result_points: number; bonus_points: number }[] = []
 
   for (const p of predictions as PredictionRow[]) {
-    const result_points = pointsForResult(
-      p.phase,
-      p.home_score, p.away_score, p.home_score_120, p.away_score_120,
-      r.home_score, r.away_score, r.home_score_120, r.away_score_120,
-    )
+    let result_points = 0
+
+    if (p.phase === 'group') {
+      result_points = pointsForResult(
+        p.phase,
+        p.home_score, p.away_score, p.home_score_120, p.away_score_120,
+        r.home_score, r.away_score, r.home_score_120, r.away_score_120,
+      )
+    } else if (bracketRow && userBrackets) {
+      const userBracket = userBrackets.get(p.user_id)
+      const predHomeTeam = userBracket?.get(matchId)?.home ?? null
+      const predAwayTeam = userBracket?.get(matchId)?.away ?? null
+
+      result_points = pointsForElimMatch(
+        predHomeTeam, predAwayTeam, p.home_score_120, p.away_score_120, p.pen_winner,
+        bracketRow.home_team, bracketRow.away_team, r.home_score_120, r.away_score_120,
+        r.went_to_pens, r.pen_winner
+      )
+    }
 
     let bonus_points = 0
 
@@ -168,8 +265,7 @@ export async function recalcPointsForMatch(supabase: SupabaseClient, matchId: st
     updates.push({ id: p.id, result_points, bonus_points })
   }
 
-  // Update en batch — Supabase no permite múltiples updates por ID en una sola query;
-  // hacemos N updates en paralelo.
+  // Update en batch
   const results = await Promise.all(
     updates.map(async u => {
       const { error } = await supabase.from('predictions')
@@ -358,9 +454,11 @@ export async function recalcPointsForUser(supabase: SupabaseClient, userId: stri
   if (!predictions || predictions.length === 0) return 0
 
   let userGroupStandings: Map<string, Map<string, number>> | null = null
+  let userBrackets: Map<string, Map<string, { home: string | null; away: string | null }>> | null = null
   const hasElim = predictions.some(p => p.phase !== 'group')
   if (hasElim) {
     userGroupStandings = await computeUserStandingsBatch(supabase, [userId])
+    userBrackets = await computeUserBracketsBatch(supabase, [userId])
   }
 
   const { data: realStandings } = await supabase
@@ -387,11 +485,28 @@ export async function recalcPointsForUser(supabase: SupabaseClient, userId: stri
     const r = resultMap.get(p.match_id)
     if (!r) continue
 
-    const result_points = pointsForResult(
-      p.phase,
-      p.home_score, p.away_score, p.home_score_120, p.away_score_120,
-      r.home_score, r.away_score, r.home_score_120, r.away_score_120,
-    )
+    let result_points = 0
+
+    if (p.phase === 'group') {
+      result_points = pointsForResult(
+        p.phase,
+        p.home_score, p.away_score, p.home_score_120, p.away_score_120,
+        r.home_score, r.away_score, r.home_score_120, r.away_score_120,
+      )
+    } else if (hasElim && userBrackets) {
+      const userBracket = userBrackets.get(userId)
+      const predHomeTeam = userBracket?.get(p.match_id)?.home ?? null
+      const predAwayTeam = userBracket?.get(p.match_id)?.away ?? null
+      const bracketRow = bracketMap.get(p.match_id)
+
+      if (bracketRow) {
+        result_points = pointsForElimMatch(
+          predHomeTeam, predAwayTeam, p.home_score_120, p.away_score_120, p.pen_winner,
+          bracketRow.home_team, bracketRow.away_team, r.home_score_120, r.away_score_120,
+          r.went_to_pens, r.pen_winner
+        )
+      }
+    }
 
     let bonus_points = 0
 
@@ -563,11 +678,11 @@ function getRealWinner(
   return winner
 }
 
-async function computeUserPodiumPredictions(
+export async function computeUserBracketsBatch(
   supabase: SupabaseClient,
   userIds: string[]
-): Promise<Map<string, { champion: string | null; runner: string | null; third: string | null; fourth: string | null }>> {
-  const result = new Map<string, { champion: string | null; runner: string | null; third: string | null; fourth: string | null }>()
+): Promise<Map<string, Map<string, { home: string | null; away: string | null }>>> {
+  const result = new Map<string, Map<string, { home: string | null; away: string | null }>>()
   if (userIds.length === 0) return result
 
   // Load real bracket for R32
@@ -586,10 +701,8 @@ async function computeUserPodiumPredictions(
     .in('user_id', userIds)
     .neq('phase', 'group')
 
-  if (!preds) return result
-
   const userPreds = new Map<string, Map<string, any>>()
-  for (const p of preds) {
+  for (const p of preds ?? []) {
     if (!userPreds.has(p.user_id)) userPreds.set(p.user_id, new Map())
     userPreds.get(p.user_id)!.set(p.match_id, p)
   }
@@ -619,18 +732,50 @@ async function computeUserPodiumPredictions(
           const homePred = predMap.get(seeding.home)
           const awayPred = predMap.get(seeding.away)
 
-          const homeWinner = getPredictedWinner(homePred, homeMatch.home, homeMatch.away, false)
-          const awayWinner = getPredictedWinner(awayPred, awayMatch.home, awayMatch.away, false)
+          const homeWinner = getPredictedWinner(homePred, homeMatch.home, homeMatch.away, !!seeding.losers)
+          const awayWinner = getPredictedWinner(awayPred, awayMatch.home, awayMatch.away, !!seeding.losers)
 
           userBracket.set(slotId, { home: homeWinner, away: awayWinner })
         }
       }
     }
 
+    result.set(userId, userBracket)
+  }
+
+  return result
+}
+
+async function computeUserPodiumPredictions(
+  supabase: SupabaseClient,
+  userIds: string[]
+): Promise<Map<string, { champion: string | null; runner: string | null; third: string | null; fourth: string | null }>> {
+  const result = new Map<string, { champion: string | null; runner: string | null; third: string | null; fourth: string | null }>()
+  if (userIds.length === 0) return result
+
+  const userBrackets = await computeUserBracketsBatch(supabase, userIds)
+
+  // Load predictions for knockout phase for userIds
+  const { data: preds } = await supabase
+    .from('predictions')
+    .select('user_id, match_id, home_score_120, away_score_120, pen_winner')
+    .in('user_id', userIds)
+    .neq('phase', 'group')
+
+  const userPreds = new Map<string, Map<string, any>>()
+  for (const p of preds ?? []) {
+    if (!userPreds.has(p.user_id)) userPreds.set(p.user_id, new Map())
+    userPreds.get(p.user_id)!.set(p.match_id, p)
+  }
+
+  for (const userId of userIds) {
+    const predMap = userPreds.get(userId) ?? new Map()
+    const userBracket = userBrackets.get(userId)
+
     const finalPred = predMap.get('FINAL')
     const thirdPred = predMap.get('THIRD')
-    const finalTeams = userBracket.get('FINAL')
-    const thirdTeams = userBracket.get('THIRD')
+    const finalTeams = userBracket?.get('FINAL')
+    const thirdTeams = userBracket?.get('THIRD')
 
     let champion: string | null = null
     let runner: string | null = null

@@ -76,6 +76,87 @@ export default function UserPredictionsEditor(props: Props) {
     return m
   }, [props.bracket])
 
+  const WINNER_PROPAGATION = useMemo(() => ({
+    'R16_1': { home: 'R32_1',  away: 'R32_2'  },
+    'R16_2': { home: 'R32_3',  away: 'R32_6'  },
+    'R16_3': { home: 'R32_4',  away: 'R32_5'  },
+    'R16_4': { home: 'R32_7',  away: 'R32_8'  },
+    'R16_5': { home: 'R32_12', away: 'R32_10' },
+    'R16_6': { home: 'R32_14', away: 'R32_9'  },
+    'R16_7': { home: 'R32_13', away: 'R32_16' },
+    'R16_8': { home: 'R32_11', away: 'R32_15' },
+
+    'QF_1': { home: 'R16_1', away: 'R16_2' },
+    'QF_2': { home: 'R16_3', away: 'R16_4' },
+    'QF_3': { home: 'R16_5', away: 'R16_6' },
+    'QF_4': { home: 'R16_7', away: 'R16_8' },
+
+    'SF_1': { home: 'QF_1', away: 'QF_2' },
+    'SF_2': { home: 'QF_3', away: 'QF_4' },
+
+    'FINAL': { home: 'SF_1', away: 'SF_2' },
+    'THIRD': { home: 'SF_1', away: 'SF_2', losers: true },
+  }), [])
+
+  const getPredictedWinner = (
+    pred: PredItem | undefined,
+    homeTeam: string | null,
+    awayTeam: string | null,
+    wantLoser = false
+  ): string | null => {
+    if (!pred || !homeTeam || !awayTeam) return null
+    if (pred.home_score_120 == null || pred.away_score_120 == null) return null
+
+    let winner: string | null = null
+    if (pred.home_score_120 > pred.away_score_120) {
+      winner = homeTeam
+    } else if (pred.home_score_120 < pred.away_score_120) {
+      winner = awayTeam
+    } else if (pred.pen_winner) {
+      winner = pred.pen_winner
+    }
+
+    if (!winner) return null
+    if (wantLoser) return winner === homeTeam ? awayTeam : homeTeam
+    return winner
+  }
+
+  const derivedBracket = useMemo(() => {
+    const bracketMap = new Map<string, { home: string | null; away: string | null }>()
+
+    // Initialize R32 slots
+    for (let i = 1; i <= 16; i++) {
+      const slotId = `R32_${i}`
+      const b = bracketByMatch.get(slotId)
+      bracketMap.set(slotId, { home: b?.home_team ?? null, away: b?.away_team ?? null })
+    }
+
+    const rounds = [
+      ['R16_1', 'R16_2', 'R16_3', 'R16_4', 'R16_5', 'R16_6', 'R16_7', 'R16_8'],
+      ['QF_1', 'QF_2', 'QF_3', 'QF_4'],
+      ['SF_1', 'SF_2'],
+      ['FINAL', 'THIRD']
+    ]
+
+    for (const round of rounds) {
+      for (const slotId of round) {
+        const config = WINNER_PROPAGATION[slotId as keyof typeof WINNER_PROPAGATION] as { home: string; away: string; losers?: boolean }
+        const homeMatch = bracketMap.get(config.home)
+        const awayMatch = bracketMap.get(config.away)
+
+        const homePred = predByMatch.get(config.home)
+        const awayPred = predByMatch.get(config.away)
+
+        const homeWinner = getPredictedWinner(homePred, homeMatch?.home ?? null, homeMatch?.away ?? null, !!config.losers)
+        const awayWinner = getPredictedWinner(awayPred, awayMatch?.home ?? null, awayMatch?.away ?? null, !!config.losers)
+
+        bracketMap.set(slotId, { home: homeWinner, away: awayWinner })
+      }
+    }
+
+    return bracketMap
+  }, [predByMatch, bracketByMatch, WINNER_PROPAGATION])
+
   const [editing, setEditing] = useState<EditState | null>(null)
   const [tab, setTab] = useState<'group' | 'elim'>('group')
 
@@ -119,8 +200,10 @@ export default function UserPredictionsEditor(props: Props) {
                     <Row
                       key={m.id}
                       matchId={m.id}
-                      home={m.home}
-                      away={m.away}
+                      predHome={m.home}
+                      predAway={m.away}
+                      realHome={m.home}
+                      realAway={m.away}
                       pred={pred}
                       real={real}
                       isElim={false}
@@ -144,16 +227,21 @@ export default function UserPredictionsEditor(props: Props) {
                     const pred = predByMatch.get(s.id)
                     const real = resultByMatch.get(s.id)
                     const b = bracketByMatch.get(s.id)
+                    const userTeams = derivedBracket.get(s.id)
+                    const predHome = userTeams?.home ?? null
+                    const predAway = userTeams?.away ?? null
                     return (
                       <Row
                         key={s.id}
                         matchId={s.id}
-                        home={b?.home_team ?? null}
-                        away={b?.away_team ?? null}
+                        predHome={predHome}
+                        predAway={predAway}
+                        realHome={b?.home_team ?? null}
+                        realAway={b?.away_team ?? null}
                         pred={pred}
                         real={real}
                         isElim={true}
-                        onEdit={() => openEdit(s.id, phase, b?.home_team ?? null, b?.away_team ?? null)}
+                        onEdit={() => openEdit(s.id, phase, predHome, predAway)}
                       />
                     )
                   })}
@@ -176,11 +264,13 @@ export default function UserPredictionsEditor(props: Props) {
 }
 
 function Row({
-  matchId, home, away, pred, real, isElim, onEdit,
+  matchId, predHome, predAway, realHome, realAway, pred, real, isElim, onEdit,
 }: {
   matchId: string
-  home: string | null
-  away: string | null
+  predHome: string | null
+  predAway: string | null
+  realHome: string | null
+  realAway: string | null
   pred?: PredItem
   real?: ResultItem
   isElim: boolean
@@ -252,11 +342,21 @@ function Row({
   const tooltip = getTooltip()
 
   return (
-    <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-3 px-4 py-2.5 items-center text-sm">
-      <div className="flex items-center gap-2 min-w-0">
-        {home ? <TeamName name={home} size="sm" /> : <span className="text-slate-600 italic text-xs">A definir</span>}
-        <span className="text-slate-600 text-xs">vs</span>
-        {away ? <TeamName name={away} size="sm" /> : <span className="text-slate-600 italic text-xs">A definir</span>}
+    <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-3 px-4 py-3 items-center text-sm">
+      <div className="flex flex-col gap-1 min-w-0">
+        <div className="flex items-center gap-2 min-w-0">
+          {predHome ? <TeamName name={predHome} size="sm" /> : <span className="text-slate-600 italic text-xs">A definir</span>}
+          <span className="text-slate-600 text-xs">vs</span>
+          {predAway ? <TeamName name={predAway} size="sm" /> : <span className="text-slate-600 italic text-xs">A definir</span>}
+        </div>
+        {isElim && realHome && realAway && (
+          <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-semibold uppercase tracking-wide">
+            <span>Cruce real:</span>
+            <span>{realHome}</span>
+            <span>vs</span>
+            <span>{realAway}</span>
+          </div>
+        )}
       </div>
       <span className="font-mono text-slate-300 text-xs whitespace-nowrap" title="Pronóstico">
         P: {predScore}
@@ -273,7 +373,7 @@ function Row({
       ) : <span className="w-10" />}
       <button
         onClick={onEdit}
-        disabled={!home || !away}
+        disabled={!predHome || !predAway}
         className="p-1 rounded text-slate-400 hover:text-amber-400 hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed"
         aria-label="Editar pronóstico"
       >
@@ -360,7 +460,7 @@ function EditModal({
                   setHome(clean.slice(0, 2))
                 }}
                 className="score-input w-14 h-10 text-center text-lg font-bold rounded-lg border-2 bg-white/5 text-white border-white/10 focus:border-amber-500 outline-none" />
-              <span className="text-slate-600">:</span>
+              <span className="text-slate-600 text-sm select-none">:</span>
               <input type="text" inputMode="numeric" value={away}
                 onChange={e => {
                   let clean = e.target.value.replace(/\D/g, '')

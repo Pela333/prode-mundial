@@ -25,6 +25,8 @@ export interface ElimMatchCardProps {
 
   onChange?: (matchId: string, home: number | null, away: number | null, pen: string | null) => void
 
+  realHomeTeam?: string | null
+  realAwayTeam?: string | null
   realHome120?: number | null
   realAway120?: number | null
   realWentToPens?: boolean | null
@@ -229,14 +231,6 @@ export default function ElimMatchCard(props: ElimMatchCardProps) {
                 className="score-input w-11 h-11 text-center text-lg font-bold rounded-lg border-2 bg-white/5 text-white outline-none border-white/10 focus:border-amber-500 focus:bg-amber-500/5 disabled:opacity-40 disabled:cursor-not-allowed"
               />
             </div>
-            {props.realStatus === 'finished' && props.realHome120 != null && props.realAway120 != null && (
-              <span className="text-[10px] text-green-400 font-bold bg-green-500/10 border border-green-500/20 px-1.5 py-0.5 rounded mt-0.5 select-none whitespace-nowrap">
-                Real: {props.realHome120}:{props.realAway120}
-                {props.realWentToPens && props.realPenWinner && (
-                  <span className="text-amber-400 ml-1">({props.realPenWinner.slice(0, 3)})</span>
-                )}
-              </span>
-            )}
           </div>
           <div className="flex-1 min-w-0 flex justify-end">
             {props.awayTeam
@@ -299,6 +293,45 @@ export default function ElimMatchCard(props: ElimMatchCardProps) {
           <p className="text-[10px] text-slate-600 italic pt-1">
             Esperando que la API defina los equipos de este partido.
           </p>
+        )}
+
+        {props.realHomeTeam && props.realAwayTeam && (
+          <div className="mt-3 pt-2.5 border-t border-white/5 flex flex-col gap-1 text-[11px] text-slate-500 bg-white/2 -mx-4 -mb-3 px-4 py-2">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-slate-400">Partido Real:</span>
+              <span className={`px-1.5 py-0.5 rounded text-[10px] uppercase font-bold ${
+                props.realStatus === 'finished'
+                  ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                  : props.realStatus === 'in_progress'
+                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse'
+                    : 'bg-slate-800 text-slate-400 border border-slate-700/20'
+              }`}>
+                {props.realStatus === 'finished' ? 'Finalizado' : props.realStatus === 'in_progress' ? 'En vivo' : 'Programado'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-slate-300">
+              <div className="flex-1 min-w-0">
+                <TeamName name={props.realHomeTeam} size="sm" align="left" />
+              </div>
+              <div className="flex items-center gap-1.5 px-3 font-mono font-bold shrink-0">
+                <span className="text-amber-400">
+                  {props.realHome120 !== null ? props.realHome120 : '–'}
+                </span>
+                <span className="text-slate-600">:</span>
+                <span className="text-amber-400">
+                  {props.realAway120 !== null ? props.realAway120 : '–'}
+                </span>
+                {props.realWentToPens && props.realPenWinner && (
+                  <span className="text-[10px] text-amber-400 font-bold bg-amber-500/15 border border-amber-500/30 px-1 rounded ml-1" title={`Ganador penales: ${props.realPenWinner}`}>
+                    {props.realPenWinner.slice(0, 3)}
+                  </span>
+                )}
+              </div>
+              <div className="flex-1 min-w-0 flex justify-end">
+                <TeamName name={props.realAwayTeam} size="sm" align="right" />
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

@@ -115,6 +115,87 @@ export default function EliminatoriaBoard({
   }, [initialPredictions])
   const [localPicks, setLocalPicks] = useState<Record<string, LocalPick>>(initialLocal)
 
+  const WINNER_PROPAGATION = useMemo(() => ({
+    'R16_1': { home: 'R32_1',  away: 'R32_2'  },
+    'R16_2': { home: 'R32_3',  away: 'R32_6'  },
+    'R16_3': { home: 'R32_4',  away: 'R32_5'  },
+    'R16_4': { home: 'R32_7',  away: 'R32_8'  },
+    'R16_5': { home: 'R32_12', away: 'R32_10' },
+    'R16_6': { home: 'R32_14', away: 'R32_9'  },
+    'R16_7': { home: 'R32_13', away: 'R32_16' },
+    'R16_8': { home: 'R32_11', away: 'R32_15' },
+
+    'QF_1': { home: 'R16_1', away: 'R16_2' },
+    'QF_2': { home: 'R16_3', away: 'R16_4' },
+    'QF_3': { home: 'R16_5', away: 'R16_6' },
+    'QF_4': { home: 'R16_7', away: 'R16_8' },
+
+    'SF_1': { home: 'QF_1', away: 'QF_2' },
+    'SF_2': { home: 'QF_3', away: 'QF_4' },
+
+    'FINAL': { home: 'SF_1', away: 'SF_2' },
+    'THIRD': { home: 'SF_1', away: 'SF_2', losers: true },
+  }), [])
+
+  const derivedBracket = useMemo(() => {
+    const bracketMap = new Map<string, { home: string | null; away: string | null }>()
+
+    // Initialize R32 slots
+    for (let i = 1; i <= 16; i++) {
+      const slotId = `R32_${i}`
+      const b = bracketByMatch.get(slotId)
+      bracketMap.set(slotId, { home: b?.home_team ?? null, away: b?.away_team ?? null })
+    }
+
+    const rounds = [
+      ['R16_1', 'R16_2', 'R16_3', 'R16_4', 'R16_5', 'R16_6', 'R16_7', 'R16_8'],
+      ['QF_1', 'QF_2', 'QF_3', 'QF_4'],
+      ['SF_1', 'SF_2'],
+      ['FINAL', 'THIRD']
+    ]
+
+    const getPredictedWinner = (
+      pred: LocalPick | undefined,
+      homeTeam: string | null,
+      awayTeam: string | null,
+      wantLoser = false
+    ): string | null => {
+      if (!pred || !homeTeam || !awayTeam) return null
+      if (pred.home == null || pred.away == null) return null
+
+      let winner: string | null = null
+      if (pred.home > pred.away) {
+        winner = homeTeam
+      } else if (pred.home < pred.away) {
+        winner = awayTeam
+      } else if (pred.pen) {
+        winner = pred.pen
+      }
+
+      if (!winner) return null
+      if (wantLoser) return winner === homeTeam ? awayTeam : homeTeam
+      return winner
+    }
+
+    for (const round of rounds) {
+      for (const slotId of round) {
+        const config = WINNER_PROPAGATION[slotId as keyof typeof WINNER_PROPAGATION] as { home: string; away: string; losers?: boolean }
+        const homeMatch = bracketMap.get(config.home)
+        const awayMatch = bracketMap.get(config.away)
+
+        const homePred = localPicks[config.home]
+        const awayPred = localPicks[config.away]
+
+        const homeWinner = getPredictedWinner(homePred, homeMatch?.home ?? null, homeMatch?.away ?? null, !!config.losers)
+        const awayWinner = getPredictedWinner(awayPred, awayMatch?.home ?? null, awayMatch?.away ?? null, !!config.losers)
+
+        bracketMap.set(slotId, { home: homeWinner, away: awayWinner })
+      }
+    }
+
+    return bracketMap
+  }, [localPicks, bracketByMatch, WINNER_PROPAGATION])
+
   const handleCardChange = useCallback((matchId: string, home: number | null, away: number | null, pen: string | null) => {
     setLocalPicks(s => ({ ...s, [matchId]: { home, away, pen } }))
   }, [])
@@ -195,15 +276,21 @@ export default function EliminatoriaBoard({
       status === 'closed_not_submitted' ? 'Tiempo agotado' :
       status === 'pending_api' ? 'Esperando confirmación del administrador' : undefined
 
+    // Proyección del bracket del usuario
+    const userTeams = derivedBracket.get(slot.id)
+    const userHome = userTeams?.home ?? null
+    const userAway = userTeams?.away ?? null
+    const isDefined = slot.phase === 'r32' ? (b?.defined === true) : (userHome !== null && userAway !== null)
+
     return (
       <ElimMatchCard
         key={slot.id}
         matchId={slot.id}
         phaseLabel={phaseLabel(slot.phase, slot.position)}
-        homeTeam={b?.home_team ?? null}
-        awayTeam={b?.away_team ?? null}
+        homeTeam={userHome}
+        awayTeam={userAway}
         scheduledAt={b?.scheduled_at ?? null}
-        defined={b?.defined === true}
+        defined={isDefined}
         initialHome120={p?.home_score_120 ?? null}
         initialAway120={p?.away_score_120 ?? null}
         initialPenWinner={p?.pen_winner ?? null}
@@ -213,6 +300,8 @@ export default function EliminatoriaBoard({
         locked={locked}
         lockedReason={lockedReason}
         onChange={handleCardChange}
+        realHomeTeam={b?.home_team ?? null}
+        realAwayTeam={b?.away_team ?? null}
         realHome120={r?.home_score_120 ?? null}
         realAway120={r?.away_score_120 ?? null}
         realWentToPens={r?.went_to_pens ?? false}
