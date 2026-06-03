@@ -124,26 +124,15 @@ export async function generateRandomResultsAction(): Promise<ActionResult> {
 
   const admin = createAdminClient()
 
-  // 1. Obtener todos los partidos en results
+  // 1. Obtener todos los partidos en results para saber cuáles existen
   const { data: results, error: resultsError } = await admin
     .from('results')
-    .select('*')
+    .select('match_id, phase')
 
   if (resultsError) return { error: 'Error al obtener partidos: ' + resultsError.message }
   if (!results || results.length === 0) {
     return { error: 'No hay partidos en la tabla results. Hacé un sync primero.' }
   }
-
-  // 2. Obtener datos de bracket para saber los nombres de equipos de eliminatorias
-  const { data: bracketRows, error: bracketError } = await admin
-    .from('bracket')
-    .select('match_id, home_team, away_team')
-
-  if (bracketError) return { error: 'Error al obtener bracket: ' + bracketError.message }
-
-  const bracketMap = new Map(
-    (bracketRows ?? []).map(b => [b.match_id, { home: b.home_team, away: b.away_team }])
-  )
 
   // Función para marcadores de fútbol realistas
   function getRandomScore(): number {
@@ -156,42 +145,18 @@ export async function generateRandomResultsAction(): Promise<ActionResult> {
     return 5
   }
 
-  const updatedResults = []
-
-  for (const r of results) {
-    const isGroup = r.phase === 'group'
-    let home_score: number | null = null
-    let away_score: number | null = null
-    let home_score_120: number | null = null
-    let away_score_120: number | null = null
-    let went_to_pens = false
-    let pen_winner: string | null = null
-
-    if (isGroup) {
-      home_score = getRandomScore()
-      away_score = getRandomScore()
-    } else {
-      home_score_120 = getRandomScore()
-      away_score_120 = getRandomScore()
-
-      if (home_score_120 === away_score_120) {
-        went_to_pens = true
-        const b = bracketMap.get(r.match_id)
-        if (b && b.home && b.away) {
-          pen_winner = Math.random() < 0.5 ? b.home : b.away
-        }
-      }
-    }
-
-    updatedResults.push({
+  // ── 1. Simular Fase de Grupos ─────────────────────────────────────────────
+  const groupResultsUpserts = []
+  for (const r of results.filter(x => x.phase === 'group')) {
+    groupResultsUpserts.push({
       match_id: r.match_id,
       phase: r.phase,
-      home_score,
-      away_score,
-      home_score_120,
-      away_score_120,
-      went_to_pens,
-      pen_winner,
+      home_score: getRandomScore(),
+      away_score: getRandomScore(),
+      home_score_120: null,
+      away_score_120: null,
+      went_to_pens: false,
+      pen_winner: null,
       status: 'finished',
       manual_override: true,
       corrected_by: user.id,
@@ -199,24 +164,25 @@ export async function generateRandomResultsAction(): Promise<ActionResult> {
     })
   }
 
-  // Guardar resultados
-  const { error: upsertError } = await admin
+  const { error: groupUpsertError } = await admin
     .from('results')
-    .upsert(updatedResults, { onConflict: 'match_id' })
+    .upsert(groupResultsUpserts, { onConflict: 'match_id' })
 
-  if (upsertError) return { error: 'Error al guardar resultados: ' + upsertError.message }
+  if (groupUpsertError) {
+    return { error: 'Error al guardar resultados de grupos: ' + groupUpsertError.message }
+  }
 
-  // 3. Calcular standings reales para cada grupo
+  // ── 2. Calcular Standings y Posiciones Reales ────────────────────────────
   const standingsUpserts = []
   const groupMatches = MATCHES.filter(m => m.phase === 'group')
-  const resultsMap = new Map(updatedResults.map(r => [r.match_id, r]))
+  const groupResultsMap = new Map(groupResultsUpserts.map(r => [r.match_id, r]))
 
   for (const g of GROUPS) {
     const gMatchesResults: GroupMatch[] = []
     let complete = true
 
     for (const m of groupMatches.filter(x => x.group === g.id)) {
-      const res = resultsMap.get(m.id)
+      const res = groupResultsMap.get(m.id)
       if (!res || res.home_score == null || res.away_score == null) {
         complete = false
         break
@@ -244,7 +210,82 @@ export async function generateRandomResultsAction(): Promise<ActionResult> {
       .from('group_standings')
       .upsert(standingsUpserts, { onConflict: 'group_id,position' })
 
-    if (standingsError) return { error: 'Error al actualizar posiciones de grupo: ' + standingsError.message }
+    if (standingsError) {
+      return { error: 'Error al actualizar posiciones de grupo: ' + standingsError.message }
+    }
+  }
+
+  // Derivar el bracket inicial (R32) basado en las posiciones de grupo terminadas
+  await deriveBracketFromResults(admin)
+
+  // ── 3. Simular Eliminatorias Secuencialmente ──────────────────────────────
+  const knockoutRounds = [
+    { phase: 'r32' },
+    { phase: 'r16' },
+    { phase: 'qf' },
+    { phase: 'sf' },
+    { phase: 'final_third' }, // FINAL y THIRD
+  ]
+
+  for (const round of knockoutRounds) {
+    // 3a. Leer bracket actual para saber los equipos definidos en esta ronda
+    const { data: bracketRows, error: bracketError } = await admin
+      .from('bracket')
+      .select('match_id, phase, home_team, away_team, defined')
+
+    if (bracketError) {
+      return { error: `Error al leer bracket para ronda: ${bracketError.message}` }
+    }
+
+    const roundMatches = (bracketRows ?? []).filter(b => {
+      if (round.phase === 'final_third') {
+        return b.phase === 'final' || b.phase === 'third'
+      }
+      return b.phase === round.phase
+    })
+
+    const roundResultsUpserts = []
+    for (const b of roundMatches) {
+      if (b.defined && b.home_team && b.away_team) {
+        const home_score_120 = getRandomScore()
+        const away_score_120 = getRandomScore()
+        let went_to_pens = false
+        let pen_winner: string | null = null
+
+        if (home_score_120 === away_score_120) {
+          went_to_pens = true
+          pen_winner = Math.random() < 0.5 ? b.home_team : b.away_team
+        }
+
+        roundResultsUpserts.push({
+          match_id: b.match_id,
+          phase: b.phase,
+          home_score: null,
+          away_score: null,
+          home_score_120,
+          away_score_120,
+          went_to_pens,
+          pen_winner,
+          status: 'finished',
+          manual_override: true,
+          corrected_by: user.id,
+          corrected_at: new Date().toISOString(),
+        })
+      }
+    }
+
+    if (roundResultsUpserts.length > 0) {
+      const { error: upsertError } = await admin
+        .from('results')
+        .upsert(roundResultsUpserts, { onConflict: 'match_id' })
+
+      if (upsertError) {
+        return { error: `Error al guardar resultados para ronda ${round.phase}: ${upsertError.message}` }
+      }
+
+      // Derivar/propagar ganadores al siguiente nivel del bracket
+      await deriveBracketFromResults(admin)
+    }
   }
 
   // Audit log
@@ -253,15 +294,12 @@ export async function generateRandomResultsAction(): Promise<ActionResult> {
     action: 'random_results_generated',
     target_type: 'result',
     meta: {
-      count: updatedResults.length,
+      count: results.length,
     },
   })
 
-  // 4. Recalcular todos los puntos de las predicciones
+  // ── 4. Recalcular Todos los Puntos de las Predicciones ────────────────────
   const recalculated = await recalcAllPoints(admin)
-
-  // 5. Derivar cruces eliminatorios automáticamente
-  await deriveBracketFromResults(admin)
 
   revalidatePath('/admin/resultados')
   revalidatePath('/admin/bracket')

@@ -315,21 +315,41 @@ export async function deriveBracketFromResults(supabase: SupabaseClient): Promis
     best8ThirdsByGroup = new Map(thirdStats.slice(0, 8).map(s => [s.group, s.team]))
   }
 
-  // ── 3. Derivar R32 ───────────────────────────────────────────────────────
-  const bracketUpserts: {
-    match_id: string; phase: Phase; position: number
-    home_team: string; away_team: string; defined: boolean
-  }[] = []
+  // ── 3. Calcular bracket completo en memoria ──────────────────────────────
+  const inMemoryBracket = new Map<string, {
+    match_id: string
+    phase: Phase
+    position: number
+    home_team: string | null
+    away_team: string | null
+    defined: boolean
+  }>()
 
-  // 3a. Partidos fijos (1° vs 2°  /  2° vs 2°)
+  for (const slot of BRACKET_SLOTS) {
+    inMemoryBracket.set(slot.id, {
+      match_id: slot.id,
+      phase: slot.phase,
+      position: slot.position,
+      home_team: null,
+      away_team: null,
+      defined: false,
+    })
+  }
+
+  // 3a. Partidos fijos (1° vs 2° / 2° vs 2°)
   for (const [slotId, seeding] of Object.entries(R32_FIXED)) {
-    const slot = BRACKET_SLOTS.find(s => s.id === slotId)!
-    const hg = seeding.home.group; const ag = seeding.away.group
-    if (!finalizedGroups.has(hg) || !finalizedGroups.has(ag)) continue
-    const homeTeam = standingsMap.get(hg)?.get(seeding.home.pos)
-    const awayTeam = standingsMap.get(ag)?.get(seeding.away.pos)
-    if (!homeTeam || !awayTeam) continue
-    bracketUpserts.push({ match_id: slotId, phase: slot.phase, position: slot.position, home_team: homeTeam, away_team: awayTeam, defined: true })
+    if (finalizedGroups.has(seeding.home.group) && finalizedGroups.has(seeding.away.group)) {
+      const homeTeam = standingsMap.get(seeding.home.group)?.get(seeding.home.pos)
+      const awayTeam = standingsMap.get(seeding.away.group)?.get(seeding.away.pos)
+      if (homeTeam && awayTeam) {
+        inMemoryBracket.set(slotId, {
+          ...inMemoryBracket.get(slotId)!,
+          home_team: homeTeam,
+          away_team: awayTeam,
+          defined: true,
+        })
+      }
+    }
   }
 
   // 3b. Partidos con terceros
@@ -339,40 +359,35 @@ export async function deriveBracketFromResults(supabase: SupabaseClient): Promis
 
     if (allocation) {
       for (const entry of R32_WITH_THIRDS) {
-        const slot = BRACKET_SLOTS.find(s => s.id === entry.slot)!
-        if (!finalizedGroups.has(entry.firstGroup)) continue
-        const homeTeam = standingsMap.get(entry.firstGroup)?.get(1)
-        if (!homeTeam) continue
+        if (finalizedGroups.has(entry.firstGroup)) {
+          const homeTeam = standingsMap.get(entry.firstGroup)?.get(1)
+          const assignedGroup = allocation.get(entry.slot)
+          const awayTeam = assignedGroup ? best8ThirdsByGroup.get(assignedGroup) : null
 
-        const assignedGroup = allocation.get(entry.slot)
-        const awayTeam = assignedGroup ? best8ThirdsByGroup.get(assignedGroup) : null
-
-        if (!awayTeam) {
-          report.errors.push(`No se pudo asignar 3° de grupos para slot ${entry.slot}`)
-          continue
+          if (homeTeam && awayTeam) {
+            inMemoryBracket.set(entry.slot, {
+              ...inMemoryBracket.get(entry.slot)!,
+              home_team: homeTeam,
+              away_team: awayTeam,
+              defined: true,
+            })
+          }
         }
-
-        bracketUpserts.push({ match_id: entry.slot, phase: slot.phase, position: slot.position, home_team: homeTeam, away_team: awayTeam, defined: true })
       }
     } else {
       report.errors.push(`No se encontró una asignación válida sin duplicados para los terceros clasificados`)
     }
   }
 
-  if (bracketUpserts.length > 0) {
-    const { error } = await supabase
-      .from('bracket')
-      .upsert(bracketUpserts, { onConflict: 'match_id' })
-    if (error) report.errors.push(`R32 upsert: ${error.message}`)
-    else {
-      report.r32Slots = bracketUpserts.length
-      for (const b of bracketUpserts) await ensureResultRow(supabase, b.match_id, b.phase)
-    }
-  }
+  // 3c. Propagar ganadores a R16, QF, SF, FINAL, THIRD
+  const { data: elimResults } = await supabase
+    .from('results')
+    .select('match_id, home_score_120, away_score_120, went_to_pens, pen_winner, status')
+    .neq('phase', 'group')
 
-  // ── 4. Propagar ganadores R16, QF, SF, FINAL, THIRD ─────────────────────
-  // Para que la cadena funcione (R32 → R16 → QF → SF → FINAL),
-  // hacemos múltiples pasadas re-leyendo el bracket actualizado.
+  const resultsMap = new Map<string, ElimResult>(
+    (elimResults ?? []).map(r => [r.match_id, r as ElimResult])
+  )
 
   const roundSlots = [
     Object.keys(WINNER_PROPAGATION).filter(k => k.startsWith('R16')),
@@ -382,64 +397,152 @@ export async function deriveBracketFromResults(supabase: SupabaseClient): Promis
   ]
 
   for (const slots of roundSlots) {
-    // Re-leer bracket actualizado
-    const { data: bracketRows } = await supabase
-      .from('bracket')
-      .select('match_id, home_team, away_team, defined')
-
-    const bracketMap = new Map<string, { home_team: string | null; away_team: string | null }>(
-      (bracketRows ?? []).map(b => [b.match_id, { home_team: b.home_team, away_team: b.away_team }])
-    )
-
-    // Re-leer resultados elim
-    const { data: elimResults } = await supabase
-      .from('results')
-      .select('match_id, home_score_120, away_score_120, went_to_pens, pen_winner, status')
-      .neq('phase', 'group')
-
-    const resultsMap = new Map<string, ElimResult>(
-      (elimResults ?? []).map(r => [r.match_id, r as ElimResult])
-    )
-
-    const roundUpserts: typeof bracketUpserts = []
-
     for (const slotId of slots) {
       const seeding = WINNER_PROPAGATION[slotId]
       if (!seeding) continue
-      const slot = BRACKET_SLOTS.find(s => s.id === slotId)!
       const wantLoser = !!seeding.losers
 
       const homeResult = resultsMap.get(seeding.home)
       const awayResult = resultsMap.get(seeding.away)
-      const homeBracket = bracketMap.get(seeding.home)
-      const awayBracket = bracketMap.get(seeding.away)
+      const homeBracket = inMemoryBracket.get(seeding.home)
+      const awayBracket = inMemoryBracket.get(seeding.away)
 
-      if (!homeResult || !awayResult || !homeBracket || !awayBracket) continue
+      if (homeResult && awayResult && homeBracket?.defined && awayBracket?.defined) {
+        const homeTeam = getWinner(homeResult, homeBracket.home_team, homeBracket.away_team, wantLoser)
+        const awayTeam = getWinner(awayResult, awayBracket.home_team, awayBracket.away_team, wantLoser)
 
-      const homeTeam = getWinner(homeResult, homeBracket.home_team, homeBracket.away_team, wantLoser)
-      const awayTeam = getWinner(awayResult, awayBracket.home_team, awayBracket.away_team, wantLoser)
-
-      if (!homeTeam || !awayTeam) continue
-
-      roundUpserts.push({ match_id: slotId, phase: slot.phase, position: slot.position, home_team: homeTeam, away_team: awayTeam, defined: true })
-    }
-
-    if (roundUpserts.length > 0) {
-      const { error } = await supabase
-        .from('bracket')
-        .upsert(roundUpserts, { onConflict: 'match_id' })
-      if (error) {
-        report.errors.push(`${slots[0]} upsert: ${error.message}`)
-      } else {
-        for (const b of roundUpserts) {
-          await ensureResultRow(supabase, b.match_id, b.phase)
-          if (b.phase === 'r16') report.r16Slots++
-          else if (b.phase === 'qf') report.qfSlots++
-          else if (b.phase === 'sf') report.sfSlots++
-          else if (b.phase === 'final') report.finalSlots++
-          else if (b.phase === 'third') report.thirdSlots++
+        if (homeTeam && awayTeam) {
+          inMemoryBracket.set(slotId, {
+            ...inMemoryBracket.get(slotId)!,
+            home_team: homeTeam,
+            away_team: awayTeam,
+            defined: true,
+          })
         }
       }
+    }
+  }
+
+  // ── 4. Comparar y actualizar en la base de datos ──────────────────────────
+  const { data: dbBracketRows } = await supabase
+    .from('bracket')
+    .select('match_id, home_team, away_team, defined')
+
+  const dbBracketMap = new Map(
+    (dbBracketRows ?? []).map(b => [b.match_id, b])
+  )
+
+  const bracketUpserts: any[] = []
+  const slotsToReset: string[] = []
+
+  for (const slot of BRACKET_SLOTS) {
+    const desired = inMemoryBracket.get(slot.id)!
+    const current = dbBracketMap.get(slot.id)
+
+    const changed = !current ||
+      current.defined !== desired.defined ||
+      current.home_team !== desired.home_team ||
+      current.away_team !== desired.away_team
+
+    if (changed) {
+      bracketUpserts.push({
+        match_id: desired.match_id,
+        phase: desired.phase,
+        position: desired.position,
+        home_team: desired.home_team,
+        away_team: desired.away_team,
+        defined: desired.defined,
+      })
+      slotsToReset.push(desired.match_id)
+    }
+
+    // Contar slots definidos para el reporte
+    if (desired.defined) {
+      if (desired.phase === 'r32') report.r32Slots++
+      else if (desired.phase === 'r16') report.r16Slots++
+      else if (desired.phase === 'qf') report.qfSlots++
+      else if (desired.phase === 'sf') report.sfSlots++
+      else if (desired.phase === 'final') report.finalSlots++
+      else if (desired.phase === 'third') report.thirdSlots++
+    }
+  }
+
+  // Realizar upserts de bracket
+  if (bracketUpserts.length > 0) {
+    const { error: bracketError } = await supabase
+      .from('bracket')
+      .upsert(bracketUpserts, { onConflict: 'match_id' })
+
+    if (bracketError) {
+      report.errors.push(`Error al guardar bracket: ${bracketError.message}`)
+    } else {
+      // Para los slots que cambiaron, resetear resultados, predicciones y submissions
+      const phasesToUnlock = new Set<string>()
+
+      for (const matchId of slotsToReset) {
+        // A. Resetear resultado real
+        const { error: resultError } = await supabase
+          .from('results')
+          .upsert({
+            match_id: matchId,
+            phase: BRACKET_SLOTS.find(s => s.id === matchId)!.phase,
+            home_score: null,
+            away_score: null,
+            home_score_120: null,
+            away_score_120: null,
+            went_to_pens: false,
+            pen_winner: null,
+            status: 'scheduled',
+            api_home_score: null,
+            api_away_score: null,
+            api_home_score_120: null,
+            api_away_score_120: null,
+            manual_override: false,
+            corrected_by: null,
+            corrected_at: null,
+          }, { onConflict: 'match_id' })
+
+        if (resultError) {
+          report.errors.push(`Error al resetear resultado para ${matchId}: ${resultError.message}`)
+        }
+
+        // B. Borrar predicciones de usuarios para este partido
+        const { error: predError } = await supabase
+          .from('predictions')
+          .delete()
+          .eq('match_id', matchId)
+
+        if (predError) {
+          report.errors.push(`Error al borrar predicciones para ${matchId}: ${predError.message}`)
+        }
+
+        // C. Determinar fase de envío a desbloquear
+        if (matchId === 'R32_1') {
+          phasesToUnlock.add('r32_first')
+        } else {
+          phasesToUnlock.add('r32_rest')
+        }
+      }
+
+      // D. Borrar submissions para desbloquear envío de predicciones
+      if (phasesToUnlock.size > 0) {
+        const { error: subError } = await supabase
+          .from('submissions')
+          .delete()
+          .in('phase', Array.from(phasesToUnlock))
+
+        if (subError) {
+          report.errors.push(`Error al desbloquear envíos para las fases ${Array.from(phasesToUnlock).join(', ')}: ${subError.message}`)
+        }
+      }
+    }
+  }
+
+  // Asegurar que exista una fila en results para todos los slots definidos (por si acaso)
+  for (const slot of BRACKET_SLOTS) {
+    const desired = inMemoryBracket.get(slot.id)!
+    if (desired.defined) {
+      await ensureResultRow(supabase, desired.match_id, desired.phase)
     }
   }
 

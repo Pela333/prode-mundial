@@ -186,6 +186,7 @@ function Row({
   isElim: boolean
   onEdit: () => void
 }) {
+  const isGroup = !isElim
   const predScore = isElim
     ? formatPair(pred?.home_score_120, pred?.away_score_120)
     : formatPair(pred?.home_score, pred?.away_score)
@@ -249,7 +250,6 @@ function Row({
   }
 
   const tooltip = getTooltip()
-  const isGroup = !isElim
 
   return (
     <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-3 px-4 py-2.5 items-center text-sm">
