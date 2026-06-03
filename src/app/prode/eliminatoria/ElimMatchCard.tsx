@@ -159,6 +159,7 @@ export default function ElimMatchCard(props: ElimMatchCardProps) {
   }
 
   const pointsBadge = () => {
+    if (props.realStatus === 'scheduled' || !props.realStatus) return null
     if (props.points === null || props.points === undefined) return null
     const tooltip = getTooltip()
     if (props.points >= 3) return (
@@ -295,7 +296,7 @@ export default function ElimMatchCard(props: ElimMatchCardProps) {
           </p>
         )}
 
-        {props.realHomeTeam && props.realAwayTeam && (
+        {props.realHomeTeam && props.realAwayTeam && props.realStatus && props.realStatus !== 'scheduled' && (
           <div className="mt-3 pt-2.5 border-t border-white/5 flex flex-col gap-1 text-[11px] text-slate-500 bg-white/2 -mx-4 -mb-3 px-4 py-2">
             <div className="flex items-center justify-between">
               <span className="font-semibold text-slate-400">Partido Real:</span>

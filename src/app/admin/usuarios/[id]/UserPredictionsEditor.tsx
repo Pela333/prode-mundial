@@ -349,7 +349,7 @@ function Row({
           <span className="text-slate-600 text-xs">vs</span>
           {predAway ? <TeamName name={predAway} size="sm" /> : <span className="text-slate-600 italic text-xs">A definir</span>}
         </div>
-        {isElim && realHome && realAway && (
+        {isElim && realHome && realAway && real && real.status !== 'scheduled' && (
           <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-semibold uppercase tracking-wide">
             <span>Cruce real:</span>
             <span>{realHome}</span>
@@ -366,7 +366,7 @@ function Row({
         R: {realScore}
         {isElim && real?.went_to_pens && real.pen_winner && <span className="text-amber-400 ml-1">/{real.pen_winner.slice(0, 3)}</span>}
       </span>
-      {pts != null ? (
+      {pts != null && real && real.status !== 'scheduled' ? (
         <span title={tooltip} className={`text-xs font-bold w-10 text-right ${pts >= 3 ? 'text-amber-400' : pts > 0 ? 'text-green-400' : 'text-slate-600'}`}>
           {pts > 0 ? `+${pts}` : '0'}
         </span>

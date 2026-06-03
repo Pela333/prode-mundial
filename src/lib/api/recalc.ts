@@ -166,7 +166,15 @@ export async function recalcPointsForMatch(supabase: SupabaseClient, matchId: st
     .maybeSingle()
 
   if (!result || result.status !== 'finished') {
-    // Sin resultado finalizado: dejamos los puntos a 0 (ya están)
+    // Sin resultado finalizado: reseteamos los puntos de las predicciones de este partido a null
+    const { error } = await supabase
+      .from('predictions')
+      .update({ result_points: null, bonus_points: null })
+      .eq('match_id', matchId)
+    if (error) {
+      console.error(`recalcPointsForMatch: Error al limpiar puntos de predicciones para ${matchId}:`, error)
+      throw new Error(`Error clearing points: ${error.message}`)
+    }
     return 0
   }
 
@@ -442,14 +450,23 @@ export async function recalcPointsForUser(supabase: SupabaseClient, userId: stri
     .select('*')
     .eq('status', 'finished')
 
-  if (!results || results.length === 0) return 0
+  if (!results || results.length === 0) {
+    // Si no hay resultados finalizados, limpiamos los puntos de todas las predicciones de este usuario
+    const { error } = await supabase
+      .from('predictions')
+      .update({ result_points: null, bonus_points: null })
+      .eq('user_id', userId)
+    if (error) {
+      console.error(`recalcPointsForUser: Error al limpiar puntos para usuario ${userId}:`, error)
+      throw new Error(`Error clearing points: ${error.message}`)
+    }
+    return 0
+  }
 
-  const matchIds = results.map(r => r.match_id)
   const { data: predictions } = await supabase
     .from('predictions')
     .select('id, user_id, match_id, phase, home_score, away_score, home_score_120, away_score_120, pen_winner')
     .eq('user_id', userId)
-    .in('match_id', matchIds)
 
   if (!predictions || predictions.length === 0) return 0
 
@@ -474,16 +491,19 @@ export async function recalcPointsForUser(supabase: SupabaseClient, userId: stri
     const { data: brackets } = await supabase
       .from('bracket')
       .select('match_id, home_team, away_team')
-      .in('match_id', matchIds)
     bracketMap = new Map((brackets ?? []).map(b => [b.match_id, b]))
   }
 
-  const updates: { id: string; result_points: number; bonus_points: number }[] = []
+  const updates: { id: string; result_points: number | null; bonus_points: number | null }[] = []
   const resultMap = new Map(results.map(r => [r.match_id, r]))
 
   for (const p of predictions as PredictionRow[]) {
     const r = resultMap.get(p.match_id)
-    if (!r) continue
+    if (!r) {
+      // Si el partido real no está finalizado o cargado, reseteamos a null
+      updates.push({ id: p.id, result_points: null, bonus_points: null })
+      continue
+    }
 
     let result_points = 0
 
