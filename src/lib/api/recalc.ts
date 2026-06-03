@@ -185,6 +185,10 @@ export async function recalcPointsForMatch(supabase: SupabaseClient, matchId: st
     throw new Error(`Error recalculating points: ${errors[0].error?.message}`)
   }
 
+  if (matchId === 'FINAL' || matchId === 'THIRD') {
+    await recalcPodiumBonus(supabase)
+  }
+
   return updates.length
 }
 
@@ -204,6 +208,7 @@ export async function recalcAllPoints(supabase: SupabaseClient): Promise<number>
     total += await recalcPointsForMatch(supabase, r.match_id)
   }
   await recalcGroupPositionBonus(supabase)
+  await recalcPodiumBonus(supabase)
   return total
 }
 
@@ -437,6 +442,7 @@ export async function recalcPointsForUser(supabase: SupabaseClient, userId: stri
   }
 
   await recalcGroupPositionBonusForUser(supabase, userId, realStandings, userGroupStandings)
+  await recalcPodiumBonusForUser(supabase, userId)
 
   return updates.length
 }
@@ -485,4 +491,296 @@ async function recalcGroupPositionBonusForUser(
   }
 
   await supabase.from('user_bonus').upsert({ user_id: userId, type: 'group_position', points: pts }, { onConflict: 'user_id,type' })
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bonus de Podio (Fase 6)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const WINNER_PROPAGATION: Record<string, { home: string; away: string; losers?: boolean }> = {
+  'R16_1': { home: 'R32_1',  away: 'R32_2'  },
+  'R16_2': { home: 'R32_3',  away: 'R32_6'  },
+  'R16_3': { home: 'R32_4',  away: 'R32_5'  },
+  'R16_4': { home: 'R32_7',  away: 'R32_8'  },
+  'R16_5': { home: 'R32_12', away: 'R32_10' },
+  'R16_6': { home: 'R32_14', away: 'R32_9'  },
+  'R16_7': { home: 'R32_13', away: 'R32_16' },
+  'R16_8': { home: 'R32_11', away: 'R32_15' },
+
+  'QF_1': { home: 'R16_1', away: 'R16_2' },
+  'QF_2': { home: 'R16_3', away: 'R16_4' },
+  'QF_3': { home: 'R16_5', away: 'R16_6' },
+  'QF_4': { home: 'R16_7', away: 'R16_8' },
+
+  'SF_1': { home: 'QF_1', away: 'QF_2' },
+  'SF_2': { home: 'QF_3', away: 'QF_4' },
+
+  'FINAL': { home: 'SF_1', away: 'SF_2' },
+  'THIRD': { home: 'SF_1', away: 'SF_2', losers: true },
+}
+
+function getPredictedWinner(
+  pred: { home_score_120: number | null; away_score_120: number | null; pen_winner: string | null } | undefined,
+  homeTeam: string | null,
+  awayTeam: string | null,
+  wantLoser = false
+): string | null {
+  if (!pred || !homeTeam || !awayTeam) return null
+  if (pred.home_score_120 == null || pred.away_score_120 == null) return null
+
+  let winner: string | null = null
+  if (pred.home_score_120 > pred.away_score_120) {
+    winner = homeTeam
+  } else if (pred.home_score_120 < pred.away_score_120) {
+    winner = awayTeam
+  } else if (pred.pen_winner) {
+    winner = pred.pen_winner
+  }
+
+  if (!winner) return null
+  if (wantLoser) return winner === homeTeam ? awayTeam : homeTeam
+  return winner
+}
+
+function getRealWinner(
+  result: { home_score_120: number | null; away_score_120: number | null; went_to_pens: boolean; pen_winner: string | null; status: string } | undefined,
+  homeTeam: string | null,
+  awayTeam: string | null,
+  wantLoser = false
+): string | null {
+  if (!result || result.status !== 'finished' || !homeTeam || !awayTeam) return null
+
+  let winner: string | null = null
+  if (result.went_to_pens && result.pen_winner) {
+    winner = result.pen_winner
+  } else if (result.home_score_120 != null && result.away_score_120 != null) {
+    if (result.home_score_120 > result.away_score_120) winner = homeTeam
+    else if (result.home_score_120 < result.away_score_120) winner = awayTeam
+  }
+
+  if (!winner) return null
+  if (wantLoser) return winner === homeTeam ? awayTeam : homeTeam
+  return winner
+}
+
+async function computeUserPodiumPredictions(
+  supabase: SupabaseClient,
+  userIds: string[]
+): Promise<Map<string, { champion: string | null; runner: string | null; third: string | null; fourth: string | null }>> {
+  const result = new Map<string, { champion: string | null; runner: string | null; third: string | null; fourth: string | null }>()
+  if (userIds.length === 0) return result
+
+  // Load real bracket for R32
+  const { data: bracketRows } = await supabase
+    .from('bracket')
+    .select('match_id, home_team, away_team')
+    .eq('phase', 'r32')
+
+  if (!bracketRows || bracketRows.length === 0) return result
+  const r32Map = new Map(bracketRows.map(b => [b.match_id, b]))
+
+  // Load predictions for knockout phase for userIds
+  const { data: preds } = await supabase
+    .from('predictions')
+    .select('user_id, match_id, home_score_120, away_score_120, pen_winner')
+    .in('user_id', userIds)
+    .neq('phase', 'group')
+
+  if (!preds) return result
+
+  const userPreds = new Map<string, Map<string, any>>()
+  for (const p of preds) {
+    if (!userPreds.has(p.user_id)) userPreds.set(p.user_id, new Map())
+    userPreds.get(p.user_id)!.set(p.match_id, p)
+  }
+
+  const rounds = [
+    Object.keys(WINNER_PROPAGATION).filter(k => k.startsWith('R16')),
+    Object.keys(WINNER_PROPAGATION).filter(k => k.startsWith('QF')),
+    Object.keys(WINNER_PROPAGATION).filter(k => k.startsWith('SF')),
+    ['FINAL', 'THIRD']
+  ]
+
+  for (const userId of userIds) {
+    const predMap = userPreds.get(userId) ?? new Map()
+
+    const userBracket = new Map<string, { home: string | null; away: string | null }>()
+    for (const [matchId, b] of r32Map.entries()) {
+      userBracket.set(matchId, { home: b.home_team, away: b.away_team })
+    }
+
+    for (const roundSlots of rounds) {
+      for (const slotId of roundSlots) {
+        const seeding = WINNER_PROPAGATION[slotId]
+        const homeMatch = userBracket.get(seeding.home)
+        const awayMatch = userBracket.get(seeding.away)
+
+        if (homeMatch && awayMatch) {
+          const homePred = predMap.get(seeding.home)
+          const awayPred = predMap.get(seeding.away)
+
+          const homeWinner = getPredictedWinner(homePred, homeMatch.home, homeMatch.away, false)
+          const awayWinner = getPredictedWinner(awayPred, awayMatch.home, awayMatch.away, false)
+
+          userBracket.set(slotId, { home: homeWinner, away: awayWinner })
+        }
+      }
+    }
+
+    const finalPred = predMap.get('FINAL')
+    const thirdPred = predMap.get('THIRD')
+    const finalTeams = userBracket.get('FINAL')
+    const thirdTeams = userBracket.get('THIRD')
+
+    let champion: string | null = null
+    let runner: string | null = null
+    let third: string | null = null
+    let fourth: string | null = null
+
+    if (finalTeams && finalPred) {
+      champion = getPredictedWinner(finalPred, finalTeams.home, finalTeams.away, false)
+      runner = getPredictedWinner(finalPred, finalTeams.home, finalTeams.away, true)
+    }
+    if (thirdTeams && thirdPred) {
+      third = getPredictedWinner(thirdPred, thirdTeams.home, thirdTeams.away, false)
+      fourth = getPredictedWinner(thirdPred, thirdTeams.home, thirdTeams.away, true)
+    }
+
+    result.set(userId, { champion, runner, third, fourth })
+  }
+
+  return result
+}
+
+export async function recalcPodiumBonus(supabase: SupabaseClient): Promise<number> {
+  const { data: finalBracket } = await supabase
+    .from('bracket')
+    .select('match_id, home_team, away_team')
+    .in('match_id', ['FINAL', 'THIRD'])
+
+  const { data: finalResults } = await supabase
+    .from('results')
+    .select('match_id, home_score_120, away_score_120, went_to_pens, pen_winner, status')
+    .in('match_id', ['FINAL', 'THIRD'])
+
+  const finalBracketMap = new Map(finalBracket?.map(b => [b.match_id, b]))
+  const finalResultsMap = new Map(finalResults?.map(r => [r.match_id, r]))
+
+  const realWinners = new Map<string, string | null>()
+  const realLosers = new Map<string, string | null>()
+
+  for (const matchId of ['FINAL', 'THIRD']) {
+    const b = finalBracketMap.get(matchId)
+    const r = finalResultsMap.get(matchId)
+    if (b && r && r.status === 'finished') {
+      const winner = getRealWinner(r, b.home_team, b.away_team, false)
+      const loser = getRealWinner(r, b.home_team, b.away_team, true)
+      realWinners.set(matchId, winner)
+      realLosers.set(matchId, loser)
+    }
+  }
+
+  const realChampion = realWinners.get('FINAL') ?? null
+  const realRunner = realLosers.get('FINAL') ?? null
+  const realThird = realWinners.get('THIRD') ?? null
+  const realFourth = realLosers.get('THIRD') ?? null
+
+  const { data: subs } = await supabase
+    .from('submissions')
+    .select('user_id')
+    .eq('phase', 'r32_rest')
+
+  const userIds = (subs ?? []).map(s => s.user_id)
+  if (userIds.length === 0) return 0
+
+  const userPodiums = await computeUserPodiumPredictions(supabase, userIds)
+
+  const upserts: { user_id: string; type: string; points: number }[] = []
+  for (const userId of userIds) {
+    const userPodium = userPodiums.get(userId)
+    if (!userPodium) continue
+
+    const ptsChampion = (realChampion && userPodium.champion === realChampion) ? 15 : 0
+    const ptsRunner = (realRunner && userPodium.runner === realRunner) ? 8 : 0
+    const ptsThird = (realThird && userPodium.third === realThird) ? 5 : 0
+    const ptsFourth = (realFourth && userPodium.fourth === realFourth) ? 3 : 0
+
+    upserts.push({ user_id: userId, type: 'podium_champion', points: ptsChampion })
+    upserts.push({ user_id: userId, type: 'podium_runner', points: ptsRunner })
+    upserts.push({ user_id: userId, type: 'podium_third', points: ptsThird })
+    upserts.push({ user_id: userId, type: 'podium_fourth', points: ptsFourth })
+  }
+
+  if (upserts.length > 0) {
+    const { error } = await supabase.from('user_bonus').upsert(upserts, { onConflict: 'user_id,type' })
+    if (error) throw new Error(`recalcPodiumBonus: ${error.message}`)
+  }
+
+  return upserts.length
+}
+
+export async function recalcPodiumBonusForUser(supabase: SupabaseClient, userId: string): Promise<void> {
+  const { data: sub } = await supabase
+    .from('submissions')
+    .select('user_id')
+    .eq('user_id', userId)
+    .eq('phase', 'r32_rest')
+    .maybeSingle()
+
+  if (!sub) {
+    await supabase.from('user_bonus').delete().eq('user_id', userId).like('type', 'podium_%')
+    return
+  }
+
+  const { data: finalBracket } = await supabase
+    .from('bracket')
+    .select('match_id, home_team, away_team')
+    .in('match_id', ['FINAL', 'THIRD'])
+
+  const { data: finalResults } = await supabase
+    .from('results')
+    .select('match_id, home_score_120, away_score_120, went_to_pens, pen_winner, status')
+    .in('match_id', ['FINAL', 'THIRD'])
+
+  const finalBracketMap = new Map(finalBracket?.map(b => [b.match_id, b]))
+  const finalResultsMap = new Map(finalResults?.map(r => [r.match_id, r]))
+
+  const realWinners = new Map<string, string | null>()
+  const realLosers = new Map<string, string | null>()
+
+  for (const matchId of ['FINAL', 'THIRD']) {
+    const b = finalBracketMap.get(matchId)
+    const r = finalResultsMap.get(matchId)
+    if (b && r && r.status === 'finished') {
+      const winner = getRealWinner(r, b.home_team, b.away_team, false)
+      const loser = getRealWinner(r, b.home_team, b.away_team, true)
+      realWinners.set(matchId, winner)
+      realLosers.set(matchId, loser)
+    }
+  }
+
+  const realChampion = realWinners.get('FINAL') ?? null
+  const realRunner = realLosers.get('FINAL') ?? null
+  const realThird = realWinners.get('THIRD') ?? null
+  const realFourth = realLosers.get('THIRD') ?? null
+
+  const userPodiums = await computeUserPodiumPredictions(supabase, [userId])
+  const userPodium = userPodiums.get(userId)
+
+  if (!userPodium) return
+
+  const ptsChampion = (realChampion && userPodium.champion === realChampion) ? 15 : 0
+  const ptsRunner = (realRunner && userPodium.runner === realRunner) ? 8 : 0
+  const ptsThird = (realThird && userPodium.third === realThird) ? 5 : 0
+  const ptsFourth = (realFourth && userPodium.fourth === realFourth) ? 3 : 0
+
+  const upserts = [
+    { user_id: userId, type: 'podium_champion', points: ptsChampion },
+    { user_id: userId, type: 'podium_runner', points: ptsRunner },
+    { user_id: userId, type: 'podium_third', points: ptsThird },
+    { user_id: userId, type: 'podium_fourth', points: ptsFourth },
+  ]
+
+  const { error } = await supabase.from('user_bonus').upsert(upserts, { onConflict: 'user_id,type' })
+  if (error) throw new Error(`recalcPodiumBonusForUser: ${error.message}`)
 }

@@ -16,6 +16,8 @@ interface RankingRow {
   exactos_total: number
   aciertos_grupo: number
   pts_eliminatoria: number
+  pts_posicion_grupo: number
+  pts_podio: number
   sent_group: boolean
   sent_r16_first: boolean
   sent_r16_rest: boolean
@@ -88,6 +90,9 @@ export default async function RankingPage() {
                 </p>
                 <p className={`text-xl font-black ${podiumColors[i]}`}>{r.total_points} pts</p>
                 <p className="text-slate-500 text-xs">{r.exactos_total} exactos</p>
+                <p className="text-slate-500 text-[10px] mt-1 border-t border-white/5 pt-1">
+                  Pos. grupo: +{r.pts_posicion_grupo || 0} · Podio: +{r.pts_podio || 0}
+                </p>
               </div>
             ))}
           </div>
@@ -127,10 +132,15 @@ export default async function RankingPage() {
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-slate-700 to-slate-600 flex items-center justify-center text-white text-sm font-bold shrink-0 group-hover/player:scale-105 transition-transform">
                     {r.first_name?.[0]?.toUpperCase()}
                   </div>
-                  <span className={`text-sm font-medium truncate group-hover/player:text-amber-400 transition-colors ${isMe ? 'text-amber-400' : 'text-white'}`}>
-                    {r.first_name} {r.last_name}
-                    {isMe && <span className="text-xs text-amber-500 ml-1">(vos)</span>}
-                  </span>
+                  <div className="flex flex-col min-w-0 animate-fade-in">
+                    <span className={`text-sm font-medium truncate group-hover/player:text-amber-400 transition-colors ${isMe ? 'text-amber-400' : 'text-white'}`}>
+                      {r.first_name} {r.last_name}
+                      {isMe && <span className="text-xs text-amber-500 ml-1">(vos)</span>}
+                    </span>
+                    <span className="text-[10px] text-slate-500 truncate mt-0.5">
+                      Pos. grupo: +{r.pts_posicion_grupo || 0} pts · Podio: +{r.pts_podio || 0} pts
+                    </span>
+                  </div>
                 </Link>
 
                 <span className="text-right" title="Estado de envíos">
