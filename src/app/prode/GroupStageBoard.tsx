@@ -6,9 +6,10 @@ import { es } from 'date-fns/locale'
 import { CheckCircle2, Clock, Lock, AlertCircle, Send, Loader2 } from 'lucide-react'
 import MatchCard from '@/components/MatchCard'
 import type { Group, Match } from '@/lib/fixture'
-import { computeGroupStandings, type GroupMatch, type StandingRow } from '@/lib/standings'
+import { computeGroupStandings, computeDetailedLiveStandings, type GroupMatch, type StandingRow } from '@/lib/standings'
 import { confirmGroupSubmission } from './actions'
 import StandingsModal from './StandingsModal'
+import TeamName from '@/components/TeamName'
 
 interface PredictionRow {
   match_id: string
@@ -92,6 +93,12 @@ export default function GroupStageBoard({
     return { filledCount: filled, missing }
   }, [scores, matches])
 
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
+
+  const toggleGroupExpand = useCallback((groupId: string) => {
+    setExpandedGroups(prev => ({ ...prev, [groupId]: !prev[groupId] }))
+  }, [])
+
   // Posiciones calculadas en vivo
   const liveStandings = useMemo<Record<string, StandingRow[] | null>>(() => {
     const out: Record<string, StandingRow[] | null> = {}
@@ -104,6 +111,38 @@ export default function GroupStageBoard({
         gMatches.push({ match: m, home: s.home, away: s.away })
       }
       out[g.id] = complete ? computeGroupStandings(g.teams, gMatches) : null
+    }
+    return out
+  }, [scores, groups, matches])
+
+  // Posiciones reales en vivo
+  const realStandings = useMemo<Record<string, StandingRow[] | null>>(() => {
+    const out: Record<string, StandingRow[] | null> = {}
+    for (const g of groups) {
+      const gMatches: GroupMatch[] = []
+      for (const m of matches.filter(x => x.group === g.id)) {
+        const r = resultsByMatch.get(m.id)
+        if (r && r.home_score !== null && r.away_score !== null) {
+          gMatches.push({ match: m, home: r.home_score, away: r.away_score })
+        }
+      }
+      out[g.id] = computeDetailedLiveStandings(g.teams, gMatches)
+    }
+    return out
+  }, [resultsByMatch, groups, matches])
+
+  // Posiciones pronosticadas en vivo (detalladas)
+  const predictedDetailedStandings = useMemo<Record<string, StandingRow[] | null>>(() => {
+    const out: Record<string, StandingRow[] | null> = {}
+    for (const g of groups) {
+      const gMatches: GroupMatch[] = []
+      for (const m of matches.filter(x => x.group === g.id)) {
+        const s = scores[m.id]
+        if (s && s.home !== null && s.away !== null) {
+          gMatches.push({ match: m, home: s.home, away: s.away })
+        }
+      }
+      out[g.id] = computeDetailedLiveStandings(g.teams, gMatches)
     }
     return out
   }, [scores, groups, matches])
@@ -223,10 +262,26 @@ export default function GroupStageBoard({
                   <p className="text-slate-500 text-xs mt-0.5">{group.teams.join(' · ')}</p>
                 </div>
               </div>
-              {groupComplete && standing && (
-                <MiniStandings standings={standing} />
-              )}
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => toggleGroupExpand(group.id)}
+                  className="px-3 py-1.5 rounded-lg border border-white/10 text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition-all select-none"
+                >
+                  {expandedGroups[group.id] ? 'Ocultar posiciones' : 'Ver posiciones'}
+                </button>
+                {groupComplete && standing && (
+                  <MiniStandings standings={standing} />
+                )}
+              </div>
             </div>
+
+            {expandedGroups[group.id] && (
+              <GroupStandingsTables
+                predictedRows={predictedDetailedStandings[group.id]}
+                realRows={realStandings[group.id]}
+              />
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {gMatches.map(match => {
@@ -340,6 +395,129 @@ function MiniStandings({ standings }: { standings: StandingRow[] }) {
           <span className="text-white">{s.team}</span>
         </span>
       ))}
+    </div>
+  )
+}
+
+interface GroupStandingsTablesProps {
+  predictedRows: StandingRow[] | null
+  realRows: StandingRow[] | null
+}
+
+function GroupStandingsTables({ predictedRows, realRows }: GroupStandingsTablesProps) {
+  const POSITION_COLORS = ['text-amber-400', 'text-slate-300', 'text-amber-600', 'text-slate-500']
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-3 mb-6 p-5 rounded-2xl bg-white/3 border border-white/6 animate-fade-in-up">
+      {/* Tabla Pronosticada */}
+      <div>
+        <h4 className="text-amber-400 font-bold text-xs mb-3 uppercase tracking-wider flex items-center gap-1.5 text-left">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+          Tabla Pronosticada
+        </h4>
+        {!predictedRows ? (
+          <p className="text-slate-500 italic text-xs text-left">Cargá tus predicciones para ver las posiciones</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-slate-300 text-left border-collapse min-w-[300px]">
+              <thead>
+                <tr className="border-b border-white/8 text-slate-500 font-medium">
+                  <th className="py-2 text-center w-8">Pos</th>
+                  <th className="py-2">Selección</th>
+                  <th className="py-2 text-center w-8">PJ</th>
+                  <th className="py-2 text-center w-8">G</th>
+                  <th className="py-2 text-center w-8">E</th>
+                  <th className="py-2 text-center w-8">P</th>
+                  <th className="py-2 text-center w-12">GF:GC</th>
+                  <th className="py-2 text-center w-8">DG</th>
+                  <th className="py-2 text-center w-8">Pts</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/4">
+                {predictedRows.map((predRow, idx) => {
+                  const position = idx + 1
+                  const realRow = realRows?.[idx]
+                  const isCorrectPos = realRow && realRow.team === predRow.team && (realRow.played ?? 0) > 0
+
+                  return (
+                    <tr key={predRow.team} className={`hover:bg-white/2 transition-colors ${isCorrectPos ? 'bg-green-500/5 text-green-200' : ''}`}>
+                      <td className="py-2.5 font-bold text-center">
+                        <span className={POSITION_COLORS[idx]}>{position}°</span>
+                      </td>
+                      <td className="py-2.5 font-medium flex items-center gap-1.5 min-w-0">
+                        <TeamName name={predRow.team} size="sm" />
+                        {isCorrectPos && (
+                          <span className="text-[9px] font-bold text-green-400 bg-green-500/10 border border-green-500/20 px-1 py-0.5 rounded leading-none whitespace-nowrap">
+                            +2 pts
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2.5 text-center text-slate-400">{predRow.played ?? 0}</td>
+                      <td className="py-2.5 text-center text-slate-400">{predRow.won ?? 0}</td>
+                      <td className="py-2.5 text-center text-slate-400">{predRow.drawn ?? 0}</td>
+                      <td className="py-2.5 text-center text-slate-400">{predRow.lost ?? 0}</td>
+                      <td className="py-2.5 text-center text-slate-400">{predRow.gf ?? 0}:{predRow.ga ?? 0}</td>
+                      <td className="py-2.5 text-center font-semibold">{predRow.gd !== undefined && predRow.gd > 0 ? `+${predRow.gd}` : predRow.gd}</td>
+                      <td className="py-2.5 text-center font-bold text-white">{predRow.points ?? 0}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Tabla Real */}
+      <div>
+        <h4 className="text-green-400 font-bold text-xs mb-3 uppercase tracking-wider flex items-center gap-1.5 text-left">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
+          Tabla Real
+        </h4>
+        {!realRows || realRows.every(r => (r.played ?? 0) === 0) ? (
+          <p className="text-slate-500 italic text-xs text-left">No hay partidos jugados todavía</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-slate-300 text-left border-collapse min-w-[300px]">
+              <thead>
+                <tr className="border-b border-white/8 text-slate-500 font-medium">
+                  <th className="py-2 text-center w-8">Pos</th>
+                  <th className="py-2">Selección</th>
+                  <th className="py-2 text-center w-8">PJ</th>
+                  <th className="py-2 text-center w-8">G</th>
+                  <th className="py-2 text-center w-8">E</th>
+                  <th className="py-2 text-center w-8">P</th>
+                  <th className="py-2 text-center w-12">GF:GC</th>
+                  <th className="py-2 text-center w-8">DG</th>
+                  <th className="py-2 text-center w-8">Pts</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/4">
+                {realRows.map((realRow, idx) => {
+                  const position = idx + 1
+                  return (
+                    <tr key={realRow.team} className="hover:bg-white/2 transition-colors">
+                      <td className="py-2.5 font-bold text-center">
+                        <span className={POSITION_COLORS[idx]}>{position}°</span>
+                      </td>
+                      <td className="py-2.5 font-medium min-w-0">
+                        <TeamName name={realRow.team} size="sm" />
+                      </td>
+                      <td className="py-2.5 text-center text-slate-400">{realRow.played ?? 0}</td>
+                      <td className="py-2.5 text-center text-slate-400">{realRow.won ?? 0}</td>
+                      <td className="py-2.5 text-center text-slate-400">{realRow.drawn ?? 0}</td>
+                      <td className="py-2.5 text-center text-slate-400">{realRow.lost ?? 0}</td>
+                      <td className="py-2.5 text-center text-slate-400">{realRow.gf ?? 0}:{realRow.ga ?? 0}</td>
+                      <td className="py-2.5 text-center font-semibold">{realRow.gd !== undefined && realRow.gd > 0 ? `+${realRow.gd}` : realRow.gd}</td>
+                      <td className="py-2.5 text-center font-bold text-white">{realRow.points ?? 0}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -39,6 +39,11 @@ export interface StandingRow {
   points: number
   gd: number
   gf: number
+  played?: number
+  won?: number
+  drawn?: number
+  lost?: number
+  ga?: number
 }
 
 function emptyStats(team: string): TeamStats {
@@ -185,5 +190,69 @@ export function computeGroupStandings(
     points: s.points,
     gd: s.gd,
     gf: s.gf,
+    played: s.played,
+    won: s.won,
+    drawn: s.drawn,
+    lost: s.lost,
+    ga: s.ga,
+  }))
+}
+
+export function computeDetailedLiveStandings(
+  teams: string[],
+  matches: GroupMatch[]
+): StandingRow[] | null {
+  if (teams.length !== 4) return null
+  
+  // A diferencia de computeGroupStandings, esta función permite partidos parciales
+  const validMatches = matches.filter(
+    m => Number.isInteger(m.home) && Number.isInteger(m.away) && m.home >= 0 && m.away >= 0
+  )
+
+  const stats = computeStats(teams, validMatches)
+  const list = [...stats.values()]
+
+  // Orden primario: puntos → DG overall → GF overall
+  list.sort((a, b) => {
+    if (a.points !== b.points) return b.points - a.points
+    if (a.gd !== b.gd) return b.gd - a.gd
+    if (a.gf !== b.gf) return b.gf - a.gf
+    return 0
+  })
+
+  // Agrupamos equipos empatados y reordenamos por head-to-head (usando solo los partidos válidos)
+  const buckets: TeamStats[][] = []
+  let current: TeamStats[] = []
+  for (const s of list) {
+    if (current.length === 0) {
+      current.push(s)
+      continue
+    }
+    const prev = current[current.length - 1]
+    if (prev.points === s.points && prev.gd === s.gd && prev.gf === s.gf) {
+      current.push(s)
+    } else {
+      buckets.push(current)
+      current = [s]
+    }
+  }
+  if (current.length) buckets.push(current)
+
+  const final: TeamStats[] = []
+  for (const bucket of buckets) {
+    final.push(...rankBucket(bucket, validMatches))
+  }
+
+  return final.slice(0, 4).map((s, i) => ({
+    position: (i + 1) as 1 | 2 | 3 | 4,
+    team: s.team,
+    points: s.points,
+    gd: s.gd,
+    gf: s.gf,
+    played: s.played,
+    won: s.won,
+    drawn: s.drawn,
+    lost: s.lost,
+    ga: s.ga,
   }))
 }
