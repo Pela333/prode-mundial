@@ -166,10 +166,10 @@ export async function recalcPointsForMatch(supabase: SupabaseClient, matchId: st
     .maybeSingle()
 
   if (!result || result.status !== 'finished') {
-    // Sin resultado finalizado: reseteamos los puntos de las predicciones de este partido a null
+    // Sin resultado finalizado: reseteamos los puntos de las predicciones de este partido a 0
     const { error } = await supabase
       .from('predictions')
-      .update({ result_points: null, bonus_points: null })
+      .update({ result_points: 0, bonus_points: 0 })
       .eq('match_id', matchId)
     if (error) {
       console.error(`recalcPointsForMatch: Error al limpiar puntos de predicciones para ${matchId}:`, error)
@@ -305,7 +305,6 @@ export async function recalcAllPoints(supabase: SupabaseClient): Promise<number>
   const { data: results } = await supabase
     .from('results')
     .select('match_id')
-    .eq('status', 'finished')
 
   let total = 0
   for (const r of results ?? []) {
@@ -454,7 +453,7 @@ export async function recalcPointsForUser(supabase: SupabaseClient, userId: stri
     // Si no hay resultados finalizados, limpiamos los puntos de todas las predicciones de este usuario
     const { error } = await supabase
       .from('predictions')
-      .update({ result_points: null, bonus_points: null })
+      .update({ result_points: 0, bonus_points: 0 })
       .eq('user_id', userId)
     if (error) {
       console.error(`recalcPointsForUser: Error al limpiar puntos para usuario ${userId}:`, error)
@@ -494,14 +493,14 @@ export async function recalcPointsForUser(supabase: SupabaseClient, userId: stri
     bracketMap = new Map((brackets ?? []).map(b => [b.match_id, b]))
   }
 
-  const updates: { id: string; result_points: number | null; bonus_points: number | null }[] = []
+  const updates: { id: string; result_points: number; bonus_points: number }[] = []
   const resultMap = new Map(results.map(r => [r.match_id, r]))
 
   for (const p of predictions as PredictionRow[]) {
     const r = resultMap.get(p.match_id)
     if (!r) {
-      // Si el partido real no está finalizado o cargado, reseteamos a null
-      updates.push({ id: p.id, result_points: null, bonus_points: null })
+      // Si el partido real no está finalizado o cargado, reseteamos a 0
+      updates.push({ id: p.id, result_points: 0, bonus_points: 0 })
       continue
     }
 

@@ -39,7 +39,7 @@ export default async function PublicUserPredictionsPage({ params }: PageProps) {
 
   // Obtener configuración global para verificar reveal_predictions_at
   const { data: config } = await supabase
-    .from('app_config').select('reveal_predictions_at').eq('id', 1).maybeSingle()
+    .from('app_config_public').select('reveal_predictions_at').eq('id', 1).maybeSingle()
 
   const isOwner = user.id === target.id
   const isAdmin = profile.role === 'admin'
