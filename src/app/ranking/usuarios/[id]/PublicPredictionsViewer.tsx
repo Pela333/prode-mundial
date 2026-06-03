@@ -3,6 +3,8 @@
 import { useMemo, useState } from 'react'
 import TeamName from '@/components/TeamName'
 import type { Group, Match, BracketSlot, Phase } from '@/lib/fixture'
+import { computeGroupStandings } from '@/lib/standings'
+import { Award, CheckCircle2, XCircle, Clock, Trophy } from 'lucide-react'
 
 export interface PredItem {
   match_id: string
@@ -44,6 +46,7 @@ interface Props {
   predictions: PredItem[]
   results: ResultItem[]
   bracket: BracketItem[]
+  realGroupStandings?: { group_id: string; position: number; team: string; finalized: boolean }[]
 }
 
 export default function PublicPredictionsViewer(props: Props) {
@@ -146,26 +149,115 @@ export default function PublicPredictionsViewer(props: Props) {
     return bracketMap
   }, [predByMatch, bracketByMatch, WINNER_PROPAGATION])
 
-  const [tab, setTab] = useState<'group' | 'elim'>('group')
+  const [tab, setTab] = useState<'group' | 'elim' | 'bonuses'>('group')
+
+  const realStandingsByGroup = useMemo(() => {
+    const result = new Map<string, { position: number; team: string; finalized: boolean }[]>()
+    if (!props.realGroupStandings) return result
+    for (const row of props.realGroupStandings) {
+      if (!result.has(row.group_id)) result.set(row.group_id, [])
+      result.get(row.group_id)!.push({ position: row.position, team: row.team, finalized: row.finalized })
+    }
+    for (const [gid, rows] of result.entries()) {
+      rows.sort((a, b) => a.position - b.position)
+    }
+    return result
+  }, [props.realGroupStandings])
+
+  const userGroupStandings = useMemo(() => {
+    const result = new Map<string, { position: number; team: string }[]>()
+    const predMap = new Map<string, { home: number | null; away: number | null }>()
+    for (const p of props.predictions) {
+      if (p.phase === 'group') {
+        predMap.set(p.match_id, { home: p.home_score, away: p.away_score })
+      }
+    }
+
+    for (const g of props.groups) {
+      const gMatchesPred: any[] = []
+      let complete = true
+      const groupMatches = props.groupMatches.filter(m => m.group === g.id)
+      for (const m of groupMatches) {
+        const p = predMap.get(m.id)
+        if (!p || p.home === null || p.away === null) {
+          complete = false
+          break
+        }
+        gMatchesPred.push({ match: m, home: p.home, away: p.away })
+      }
+      if (!complete) continue
+      const standing = computeGroupStandings(g.teams, gMatchesPred)
+      if (standing) {
+        result.set(g.id, standing.map(row => ({ position: row.position, team: row.team })))
+      }
+    }
+    return result
+  }, [props.groups, props.groupMatches, props.predictions])
+
+  // Helper for real winner
+  const getRealWinner = (
+    result: ResultItem | undefined,
+    homeTeam: string | null,
+    awayTeam: string | null,
+    wantLoser = false
+  ): string | null => {
+    if (!result || result.status !== 'finished' || !homeTeam || !awayTeam) return null
+
+    let winner: string | null = null
+    if (result.went_to_pens && result.pen_winner) {
+      winner = result.pen_winner
+    } else if (result.home_score_120 != null && result.away_score_120 != null) {
+      if (result.home_score_120 > result.away_score_120) winner = homeTeam
+      else if (result.home_score_120 < result.away_score_120) winner = awayTeam
+    }
+
+    if (!winner) return null
+    if (wantLoser) return winner === homeTeam ? awayTeam : homeTeam
+    return winner
+  }
+
+  const finalTeams = derivedBracket.get('FINAL')
+  const finalPred = predByMatch.get('FINAL')
+  const thirdTeams = derivedBracket.get('THIRD')
+  const thirdPred = predByMatch.get('THIRD')
+
+  const predChampion = getPredictedWinner(finalPred, finalTeams?.home ?? null, finalTeams?.away ?? null, false)
+  const predRunner = getPredictedWinner(finalPred, finalTeams?.home ?? null, finalTeams?.away ?? null, true)
+  const predThird = getPredictedWinner(thirdPred, thirdTeams?.home ?? null, thirdTeams?.away ?? null, false)
+  const predFourth = getPredictedWinner(thirdPred, thirdTeams?.home ?? null, thirdTeams?.away ?? null, true)
+
+  const realFinalTeams = bracketByMatch.get('FINAL')
+  const realFinalResult = resultByMatch.get('FINAL')
+  const realThirdTeams = bracketByMatch.get('THIRD')
+  const realThirdResult = resultByMatch.get('THIRD')
+
+  const realChampion = getRealWinner(realFinalResult, realFinalTeams?.home_team ?? null, realFinalTeams?.away_team ?? null, false)
+  const realRunner = getRealWinner(realFinalResult, realFinalTeams?.home_team ?? null, realFinalTeams?.away_team ?? null, true)
+  const realThird = getRealWinner(realThirdResult, realThirdTeams?.home_team ?? null, realThirdTeams?.away_team ?? null, false)
+  const realFourth = getRealWinner(realThirdResult, realThirdTeams?.home_team ?? null, realThirdTeams?.away_team ?? null, true)
 
   return (
     <>
-      <div className="flex rounded-xl bg-white/4 p-1 mb-6 max-w-md">
-        {(['group', 'elim'] as const).map(t => (
+      <div className="flex rounded-xl bg-white/4 p-1 mb-6 max-w-lg">
+        {[
+          { id: 'group', label: 'Fase de grupos' },
+          { id: 'elim', label: 'Eliminatoria' },
+          { id: 'bonuses', label: 'Bonos (Grupos y Podio)' }
+        ].map(t => (
           <button
-            key={t}
+            key={t.id}
             type="button"
-            onClick={() => setTab(t)}
-            className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-              tab === t ? 'bg-amber-500 text-black shadow' : 'text-slate-400 hover:text-white'
+            onClick={() => setTab(t.id as any)}
+            className={`flex-1 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+              tab === t.id ? 'bg-amber-500 text-black shadow' : 'text-slate-400 hover:text-white'
             }`}
           >
-            {t === 'group' ? 'Fase de grupos' : 'Eliminatoria'}
+            {t.label}
           </button>
         ))}
       </div>
 
-      {tab === 'group' ? (
+      {tab === 'group' && (
         <div className="space-y-6">
           {props.groups.map(g => (
             <section key={g.id} className="animate-fade-in-up">
@@ -192,7 +284,9 @@ export default function PublicPredictionsViewer(props: Props) {
             </section>
           ))}
         </div>
-      ) : (
+      )}
+
+      {tab === 'elim' && (
         <div className="space-y-6">
           {(['r32', 'r16', 'qf', 'sf', 'third', 'final'] as Phase[]).map(phase => {
             const phaseSlots = props.bracketSlots.filter(s => s.phase === phase)
@@ -225,7 +319,201 @@ export default function PublicPredictionsViewer(props: Props) {
           })}
         </div>
       )}
+
+      {tab === 'bonuses' && (
+        <div className="space-y-8 animate-fade-in-up">
+          {/* Section 1: Tournament Podium */}
+          <div className="rounded-2xl border border-white/8 bg-[#111827] p-6">
+            <h3 className="text-white font-bold text-lg mb-1 flex items-center gap-2">
+              <Trophy className="text-amber-400" size={20} />
+              Podio del Torneo
+            </h3>
+            <p className="text-slate-400 text-xs mb-6">
+              Puntos acumulados al finalizar el torneo en base a los aciertos exactos de cada puesto del podio.
+            </p>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <PodiumCard
+                title="Campeón (1°)"
+                predTeam={predChampion}
+                realTeam={realChampion}
+                ptsLabel="+15 pts"
+                isFinished={realFinalResult?.status === 'finished'}
+                accentColor="from-amber-500/10 to-amber-500/5 border-amber-500/20 text-amber-300"
+              />
+              <PodiumCard
+                title="Subcampeón (2°)"
+                predTeam={predRunner}
+                realTeam={realRunner}
+                ptsLabel="+8 pts"
+                isFinished={realFinalResult?.status === 'finished'}
+                accentColor="from-slate-500/10 to-slate-500/5 border-slate-500/20 text-slate-300"
+              />
+              <PodiumCard
+                title="Tercer Puesto (3°)"
+                predTeam={predThird}
+                realTeam={realThird}
+                ptsLabel="+5 pts"
+                isFinished={realThirdResult?.status === 'finished'}
+                accentColor="from-amber-700/15 to-amber-700/5 border-amber-700/20 text-amber-600"
+              />
+              <PodiumCard
+                title="Cuarto Puesto (4°)"
+                predTeam={predFourth}
+                realTeam={realFourth}
+                ptsLabel="+3 pts"
+                isFinished={realThirdResult?.status === 'finished'}
+                accentColor="from-blue-500/10 to-blue-500/5 border-blue-500/20 text-blue-400"
+              />
+            </div>
+          </div>
+
+          {/* Section 2: Group Positions */}
+          <div className="rounded-2xl border border-white/8 bg-[#111827] p-6">
+            <h3 className="text-white font-bold text-lg mb-1 flex items-center gap-2">
+              <Award className="text-amber-400" size={20} />
+              Posiciones Exactas de Grupos
+            </h3>
+            <p className="text-slate-400 text-xs mb-6">
+              Suma <strong className="text-white">+2 puntos</strong> por cada equipo que coincida exactamente en su posición final de grupo (1° a 4°). Máximo 8 pts por grupo.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {props.groups.map(g => {
+                const pred = userGroupStandings.get(g.id)
+                const real = realStandingsByGroup.get(g.id)
+                const hasReal = real && real.length > 0
+                const finalized = hasReal && real[0].finalized
+                
+                let ptsSum = 0
+                if (finalized && pred) {
+                  for (let i = 0; i < 4; i++) {
+                    if (pred[i]?.team === real[i]?.team) ptsSum += 2
+                  }
+                }
+
+                return (
+                  <div key={g.id} className="rounded-xl border border-white/5 bg-white/2 p-4 flex flex-col justify-between hover:border-white/10 transition-colors">
+                    <div>
+                      <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-3">
+                        <span className="font-bold text-white text-sm">Grupo {g.name.split(' ').pop()}</span>
+                        {finalized ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-500/10 text-green-400 border border-green-500/20">
+                            +{ptsSum} / 8 pts
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-500 border border-slate-700/20 flex items-center gap-1">
+                            <Clock size={9} /> Parcial
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        {[1, 2, 3, 4].map(pos => {
+                          const pTeam = pred?.[pos - 1]?.team
+                          const rTeam = real?.[pos - 1]?.team
+                          const isCorrect = finalized && pTeam && rTeam && pTeam === rTeam
+
+                          return (
+                            <div key={pos} className="grid grid-cols-[1.5rem_1fr] items-center gap-1.5 text-xs">
+                              <span className="font-bold text-slate-500 text-right">{pos}°</span>
+                              <div className="flex items-center justify-between min-w-0">
+                                <div className="truncate flex-1 min-w-0">
+                                  {pTeam ? (
+                                    <span className={isCorrect ? 'text-green-400 font-medium' : 'text-slate-300'}>
+                                      {pTeam}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-600 italic">Sin pronóstico</span>
+                                  )}
+                                  {hasReal && !isCorrect && rTeam && (
+                                    <span className="text-[10px] text-slate-500 block leading-tight truncate">
+                                      Real: {rTeam}
+                                    </span>
+                                  )}
+                                </div>
+                                {finalized && pTeam ? (
+                                  isCorrect ? (
+                                    <CheckCircle2 size={12} className="text-green-500 shrink-0 ml-1.5" />
+                                  ) : (
+                                    <XCircle size={12} className="text-red-500/80 shrink-0 ml-1.5" />
+                                  )
+                                ) : null}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </>
+  )
+}
+
+function PodiumCard({
+  title,
+  predTeam,
+  realTeam,
+  ptsLabel,
+  isFinished,
+  accentColor,
+}: {
+  title: string
+  predTeam: string | null
+  realTeam: string | null
+  ptsLabel: string
+  isFinished: boolean
+  accentColor: string
+}) {
+  const isCorrect = isFinished && predTeam && realTeam && predTeam === realTeam
+  
+  return (
+    <div className={`rounded-xl border bg-gradient-to-br p-4 flex flex-col justify-between ${accentColor}`}>
+      <div>
+        <span className="text-xs uppercase font-bold tracking-wide text-slate-400">{title}</span>
+        <div className="mt-2 min-h-[3rem]">
+          <span className="text-sm font-bold text-white block">
+            {predTeam ?? '—'}
+          </span>
+          <span className="text-[10px] text-slate-500 block mt-1">
+            Pronosticado
+          </span>
+        </div>
+      </div>
+
+      <div className="border-t border-white/5 pt-3 mt-3 flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <span className="text-[10px] text-slate-500 block">Resultado Real</span>
+          <span className="text-xs font-semibold text-slate-300 truncate block">
+            {isFinished ? (realTeam ?? '—') : 'A definir'}
+          </span>
+        </div>
+
+        {isFinished ? (
+          isCorrect ? (
+            <div className="text-right shrink-0">
+              <span className="text-xs font-black text-green-400 block">{ptsLabel}</span>
+              <span className="text-[9px] uppercase font-bold text-green-500/80">Acertado</span>
+            </div>
+          ) : (
+            <div className="text-right shrink-0">
+              <span className="text-xs font-black text-slate-500 block">0 pts</span>
+              <span className="text-[9px] uppercase font-bold text-red-500/80">Incorrecto</span>
+            </div>
+          )
+        ) : (
+          <div className="text-right shrink-0">
+            <span className="text-xs font-black text-slate-500 block">Pendiente</span>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }
 

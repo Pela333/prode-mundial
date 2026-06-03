@@ -103,6 +103,11 @@ export default async function PublicUserPredictionsPage({ params }: PageProps) {
   const { data: bracketRows } = await supabase
     .from('bracket').select('match_id, home_team, away_team, scheduled_at, defined')
 
+  // group_standings reales
+  const { data: realGroupStandings } = await supabase
+    .from('group_standings')
+    .select('group_id, position, team, finalized')
+
   // Mapeamos a las interfaces de UI
   const predList: PredItem[] = (preds ?? []).map(p => ({
     match_id: p.match_id,
@@ -187,6 +192,7 @@ export default async function PublicUserPredictionsPage({ params }: PageProps) {
           predictions={predList}
           results={resultList}
           bracket={bracketList}
+          realGroupStandings={realGroupStandings ?? []}
         />
       </main>
     </div>
