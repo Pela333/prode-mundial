@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { BRACKET_SLOTS } from '@/lib/fixture'
-import { recalcPointsForUser } from '@/lib/api/recalc'
+import { recalcPointsForUser, computeUserBracketsBatch } from '@/lib/api/recalc'
 
 const R32_FIRST_SLOT = 'R32_1'
 const R32_REST_SLOTS = BRACKET_SLOTS.filter(s => s.id !== R32_FIRST_SLOT).map(s => s.id)
@@ -87,11 +87,12 @@ export async function saveElimDraft({ matchId, homeScore120, awayScore120, penWi
     return { error: 'Este partido todavía no tiene equipos confirmados' }
   }
 
-  // Validar pen_winner es uno de los dos equipos del bracket (si vino)
+  // Validar pen_winner es uno de los dos equipos del partido del usuario (si vino)
   if (penWinner !== null) {
-    const { data: bracket } = await supabase
-      .from('bracket').select('home_team, away_team').eq('match_id', matchId).maybeSingle()
-    if (!bracket || (penWinner !== bracket.home_team && penWinner !== bracket.away_team)) {
+    const userBrackets = await computeUserBracketsBatch(supabase, [user.id])
+    const userBracket = userBrackets.get(user.id)
+    const matchTeams = userBracket?.get(matchId)
+    if (!matchTeams || (penWinner !== matchTeams.home && penWinner !== matchTeams.away)) {
       return { error: 'El ganador por penales debe ser uno de los dos equipos del partido' }
     }
   }
