@@ -170,13 +170,20 @@ export async function recalcPointsForMatch(supabase: SupabaseClient, matchId: st
 
   // Update en batch — Supabase no permite múltiples updates por ID en una sola query;
   // hacemos N updates en paralelo.
-  await Promise.all(
-    updates.map(u =>
-      supabase.from('predictions')
+  const results = await Promise.all(
+    updates.map(async u => {
+      const { error } = await supabase.from('predictions')
         .update({ result_points: u.result_points, bonus_points: u.bonus_points })
         .eq('id', u.id)
-    )
+      return { id: u.id, error }
+    })
   )
+
+  const errors = results.filter(r => r.error)
+  if (errors.length > 0) {
+    console.error(`recalcPointsForMatch: Error al actualizar ${errors.length} predicciones. Primer error:`, errors[0].error)
+    throw new Error(`Error recalculating points: ${errors[0].error?.message}`)
+  }
 
   return updates.length
 }
@@ -414,13 +421,20 @@ export async function recalcPointsForUser(supabase: SupabaseClient, userId: stri
     updates.push({ id: p.id, result_points, bonus_points })
   }
 
-  await Promise.all(
-    updates.map(u =>
-      supabase.from('predictions')
+  const updateResults = await Promise.all(
+    updates.map(async u => {
+      const { error } = await supabase.from('predictions')
         .update({ result_points: u.result_points, bonus_points: u.bonus_points })
         .eq('id', u.id)
-    )
+      return { id: u.id, error }
+    })
   )
+
+  const errors = updateResults.filter(r => r.error)
+  if (errors.length > 0) {
+    console.error(`recalcPointsForUser: Error al actualizar ${errors.length} predicciones. Primer error:`, errors[0].error)
+    throw new Error(`Error recalculating points: ${errors[0].error?.message}`)
+  }
 
   await recalcGroupPositionBonusForUser(supabase, userId, realStandings, userGroupStandings)
 
