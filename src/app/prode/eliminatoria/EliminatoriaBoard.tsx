@@ -294,7 +294,7 @@ export default function EliminatoriaBoard({
         initialHome120={p?.home_score_120 ?? null}
         initialAway120={p?.away_score_120 ?? null}
         initialPenWinner={p?.pen_winner ?? null}
-        points={p ? (p.result_points ?? 0) + (p.bonus_points ?? 0) : null}
+        points={p && p.result_points !== null ? (p.result_points ?? 0) + (p.bonus_points ?? 0) : null}
         resultPoints={p?.result_points ?? null}
         bonusPoints={p?.bonus_points ?? null}
         locked={locked}

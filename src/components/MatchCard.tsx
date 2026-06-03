@@ -126,6 +126,7 @@ export default function MatchCard({
   }
 
   const pointsBadge = () => {
+    if (realStatus === 'scheduled' || !realStatus) return null
     if (points === null || points === undefined) return null
     const tooltip = getTooltip()
     if (points >= 3) return (

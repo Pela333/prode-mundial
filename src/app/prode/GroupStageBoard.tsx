@@ -294,7 +294,7 @@ export default function GroupStageBoard({
                     match={match}
                     initialHome={pred?.home_score ?? null}
                     initialAway={pred?.away_score ?? null}
-                    points={pred ? (pred.result_points ?? 0) + (pred.bonus_points ?? 0) : null}
+                    points={pred && pred.result_points !== null ? (pred.result_points ?? 0) + (pred.bonus_points ?? 0) : null}
                     resultPoints={pred?.result_points ?? null}
                     bonusPoints={pred?.bonus_points ?? null}
                     locked={locked}
