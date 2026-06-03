@@ -72,6 +72,17 @@ export async function saveGroupDraft({ matchId, homeScore, awayScore }: SaveDraf
       .eq('user_id', user.id)
       .eq('match_id', matchId)
     if (error) return { error: 'No pudimos borrar el pronóstico' }
+
+    // Recalcular y revalidar
+    try {
+      await recalcPointsForUser(supabase, user.id)
+    } catch (err) {
+      console.error('Error recalculating points after group draft delete:', err)
+    }
+    revalidatePath('/prode')
+    revalidatePath('/ranking')
+    revalidatePath('/ranking/usuarios/[id]', 'page')
+
     return { ok: true }
   }
 
@@ -90,6 +101,17 @@ export async function saveGroupDraft({ matchId, homeScore, awayScore }: SaveDraf
     )
 
   if (error) return { error: 'No pudimos guardar el pronóstico' }
+
+  // Recalcular y revalidar
+  try {
+    await recalcPointsForUser(supabase, user.id)
+  } catch (err) {
+    console.error('Error recalculating points after group draft save:', err)
+  }
+  revalidatePath('/prode')
+  revalidatePath('/ranking')
+  revalidatePath('/ranking/usuarios/[id]', 'page')
+
   return { ok: true }
 }
 

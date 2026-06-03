@@ -100,8 +100,12 @@ export async function adminUpdatePredictionAction(input: AdminEditPredictionInpu
   let recalculated = 0
   try { recalculated = await recalcPointsForMatch(admin, input.matchId) } catch { /* no fatal */ }
 
-  revalidatePath(`/admin/usuarios/${input.userId}`)
+  revalidatePath('/prode')
+  revalidatePath('/prode/eliminatoria')
   revalidatePath('/ranking')
+  revalidatePath('/ranking/usuarios/[id]', 'page')
+  revalidatePath('/admin/usuarios/[id]', 'page')
+
   return { ok: true, recalculated }
 }
 

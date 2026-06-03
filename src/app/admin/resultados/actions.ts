@@ -111,10 +111,14 @@ export async function correctResultAction(input: CorrectResultInput): Promise<Ac
   // Derivar cruces eliminatorios a partir de los resultados actualizados
   await deriveBracketFromResults(admin)
 
-  revalidatePath('/admin/resultados')
-  revalidatePath('/admin/bracket')
+  revalidatePath('/prode')
   revalidatePath('/prode/eliminatoria')
   revalidatePath('/ranking')
+  revalidatePath('/ranking/usuarios/[id]', 'page')
+  revalidatePath('/admin/resultados')
+  revalidatePath('/admin/bracket')
+  revalidatePath('/admin/usuarios/[id]', 'page')
+
   return { ok: true, recalculated }
 }
 
