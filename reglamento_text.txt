@@ -1,0 +1,48 @@
+REGLAMENTO PRODE MUNDIAL 2026
+1. DINÁMICA DE JUEGO
+El torneo se divide en dos etapas de entrega obligatorias.
+Etapa 1: Se pronostican todos los partidos de la Fase de Grupos y las posiciones finales de cada grupo (1°, 2°, 3° y 4º).
+Etapa 2: Una vez definidos los clasificados reales, se completa el cuadro de eliminación directa (desde Dieciseisavos hasta la Final).
+2. SISTEMA DE PUNTUACIÓN
+A. Fase de Grupos
+Se consideran los resultados al finalizar los 90 minutos reglamentarios.
+Resultado Exacto: 3 puntos (Acertar el resultado numérico).
+Resultado: 1 punto (Acertar ganador o empate, pero no el resultado exacto).
+Bonus Clasificación: 2 puntos por cada equipo que el jugador logre ubicar en la posición EXACTA de clasificación (1°, 2°, 3° o 4º) según sus propios resultados pronosticados en la planilla.
+B. Etapa Eliminatoria (Dieciseisavos a Final)
+Se considera el resultado final tras los 120 minutos (incluyendo prórroga, antes de los penales).
+Resultado Exacto (120'): 3 puntos.
+Resultado (120'): 1 punto.
+Bonus Penales (Independiente): En todos los partidos de eliminación directa, el jugador debe elegir un ganador de tanda de penales OBLIGATORIAMENTE. Si el partido llega a esa instancia y se acierta el ganador, se suma el punto sin importar qué marcador se puso en los 120'.
+Bonus Posicionamiento: +1 punto por partido si el equipo que gana fue colocado por el usuario en esa misma posición de clasificación durante la Etapa 1.
+C. Bonus de Podio (Premio Final)
+Al concluir el torneo, se otorgan puntos adicionales por acertar los equipos que ocupen los cuatro primeros puestos en el lugar exacto:
+Campeón: 15 puntos.
+Subcampeón (2°): 8 puntos.
+Tercer Puesto (3°): 5 puntos.
+Cuarto Puesto (4°): 3 puntos.
+3. TABLA RESUMEN DE PUNTOS
+Acierto
+Puntos
+Observaciones
+Resultado Exacto
+3
+En cualquier fase (90' o 120').
+Ganador/Empate
+1
+En cualquier fase (90' o 120').
+Posición Grupo
+2
+Por cada equipo en su lugar correcto.
+Ganador Penales
+1
+Elección obligatoria, independiente del resultado.
+Posición Original
+1
+Extra por cada partido de fase eliminatoria.
+4. CRITERIOS DE DESEMPATE
+En caso de igualdad de puntos al finalizar el mundial, el orden de prioridad para definir los ganadores de la será:
+Mayor cantidad de Marcadores Exactos totales en todo el torneo.
+Mayor cantidad de Posiciones en fase de grupos acertadas.
+Mayor cantidad de puntos obtenidos exclusivamente en la Etapa Eliminatoria.
+Si persiste la igualdad, se dividirá el premio correspondiente entre los participantes involucrados.

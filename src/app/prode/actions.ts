@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { GROUPS, MATCHES } from '@/lib/fixture'
 import { computeGroupStandings, type StandingRow, type GroupMatch } from '@/lib/standings'
+import { recalcPointsForUser } from '@/lib/api/recalc'
 
 export interface SaveDraftInput {
   matchId: string
@@ -162,6 +163,13 @@ export async function confirmGroupSubmission(): Promise<ConfirmGroupResult> {
   if (subErr) {
     if (subErr.code === '23505') return { error: 'Ya enviaste tus pronósticos de grupos' }
     return { error: 'No pudimos registrar el envío. Intentá de nuevo.' }
+  }
+
+  // Recalcular puntos del usuario (por si ingresó tarde/en testing con partidos ya jugados)
+  try {
+    await recalcPointsForUser(supabase, user.id)
+  } catch (err) {
+    console.error('Error recalculating points on group submission:', err)
   }
 
   revalidatePath('/prode')

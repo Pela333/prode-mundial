@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { BRACKET_SLOTS } from '@/lib/fixture'
+import { recalcPointsForUser } from '@/lib/api/recalc'
 
 const R32_FIRST_SLOT = 'R32_1'
 const R32_REST_SLOTS = BRACKET_SLOTS.filter(s => s.id !== R32_FIRST_SLOT).map(s => s.id)
@@ -180,6 +181,13 @@ export async function confirmR32FirstSubmission(): Promise<ConfirmResult> {
     return { error: 'No pudimos registrar el envío' }
   }
 
+  // Recalcular puntos del usuario
+  try {
+    await recalcPointsForUser(supabase, user.id)
+  } catch (err) {
+    console.error('Error recalculating points on r32_first submission:', err)
+  }
+
   revalidatePath('/prode/eliminatoria')
   return { ok: true, submittedAt: new Date().toISOString() }
 }
@@ -231,6 +239,13 @@ export async function confirmR32RestSubmission(): Promise<ConfirmResult> {
   if (error) {
     if (error.code === '23505') return { error: 'Ya enviaste tus pronósticos de la eliminatoria' }
     return { error: 'No pudimos registrar el envío' }
+  }
+
+  // Recalcular puntos del usuario
+  try {
+    await recalcPointsForUser(supabase, user.id)
+  } catch (err) {
+    console.error('Error recalculating points on r32_rest submission:', err)
   }
 
   revalidatePath('/prode/eliminatoria')

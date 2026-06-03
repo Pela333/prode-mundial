@@ -238,6 +238,39 @@ async function computeThirdStats(supabase: SupabaseClient): Promise<ThirdStats[]
 // Función principal
 // ─────────────────────────────────────────────────────────────────────────────
 
+function findValidAllocation(
+  slots: typeof R32_WITH_THIRDS,
+  qualifiedGroups: string[]
+): Map<string, string> | null {
+  const assignment = new Map<string, string>() // slot -> group
+  const usedGroups = new Set<string>()
+
+  function backtrack(index: number): boolean {
+    if (index === slots.length) {
+      return true
+    }
+
+    const currentSlot = slots[index]
+    for (const group of currentSlot.possibleThirdGroups) {
+      if (qualifiedGroups.includes(group) && !usedGroups.has(group)) {
+        usedGroups.add(group)
+        assignment.set(currentSlot.slot, group)
+        if (backtrack(index + 1)) {
+          return true
+        }
+        usedGroups.delete(group)
+        assignment.delete(currentSlot.slot)
+      }
+    }
+    return false
+  }
+
+  if (backtrack(0)) {
+    return assignment
+  }
+  return null
+}
+
 export interface BracketDeriveReport {
   r32Slots: number
   r16Slots: number
@@ -301,23 +334,28 @@ export async function deriveBracketFromResults(supabase: SupabaseClient): Promis
 
   // 3b. Partidos con terceros
   if (best8ThirdsByGroup) {
-    for (const entry of R32_WITH_THIRDS) {
-      const slot = BRACKET_SLOTS.find(s => s.id === entry.slot)!
-      if (!finalizedGroups.has(entry.firstGroup)) continue
-      const homeTeam = standingsMap.get(entry.firstGroup)?.get(1)
-      if (!homeTeam) continue
+    const qualifiedGroups = Array.from(best8ThirdsByGroup.keys())
+    const allocation = findValidAllocation(R32_WITH_THIRDS, qualifiedGroups)
 
-      // Buscar el tercer clasificado que viene de uno de los grupos posibles
-      const awayTeam = entry.possibleThirdGroups
-        .map(g => best8ThirdsByGroup!.get(g))
-        .find(t => t != null) ?? null
+    if (allocation) {
+      for (const entry of R32_WITH_THIRDS) {
+        const slot = BRACKET_SLOTS.find(s => s.id === entry.slot)!
+        if (!finalizedGroups.has(entry.firstGroup)) continue
+        const homeTeam = standingsMap.get(entry.firstGroup)?.get(1)
+        if (!homeTeam) continue
 
-      if (!awayTeam) {
-        report.errors.push(`No se encontró 3° de grupos ${entry.possibleThirdGroups.join('/')} para slot ${entry.slot}`)
-        continue
+        const assignedGroup = allocation.get(entry.slot)
+        const awayTeam = assignedGroup ? best8ThirdsByGroup.get(assignedGroup) : null
+
+        if (!awayTeam) {
+          report.errors.push(`No se pudo asignar 3° de grupos para slot ${entry.slot}`)
+          continue
+        }
+
+        bracketUpserts.push({ match_id: entry.slot, phase: slot.phase, position: slot.position, home_team: homeTeam, away_team: awayTeam, defined: true })
       }
-
-      bracketUpserts.push({ match_id: entry.slot, phase: slot.phase, position: slot.position, home_team: homeTeam, away_team: awayTeam, defined: true })
+    } else {
+      report.errors.push(`No se encontró una asignación válida sin duplicados para los terceros clasificados`)
     }
   }
 

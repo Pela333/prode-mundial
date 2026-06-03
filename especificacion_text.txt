@@ -1,0 +1,230 @@
+PRODE MUNDIAL 2026
+Especificación Completa de la Web App
+1. Sistema de Puntuación
+Tabla de puntos
+Acierto
+Puntos
+Observaciones
+Resultado exacto (90' o 120')
+3 pts
+Cualquier fase
+Ganador / Empate correcto (no exacto)
+1 pt
+Cualquier fase
+Posición exacta en grupo (por equipo)
+2 pts
+Calculada automáticamente, no se ingresa
+Ganador por penales correcto
+1 pt
+Solo si el partido llegó realmente a penales
+Bonus posicionamiento (eliminatoria)
+1 pt
+Si el ganador real fue clasificado en esa posición por el usuario
+Campeón exacto
+15 pts
+Bonus de podio al finalizar el torneo
+Subcampeón exacto
+8 pts
+Bonus de podio al finalizar el torneo
+Tercer puesto exacto
+5 pts
+Bonus de podio al finalizar el torneo
+Cuarto puesto exacto
+3 pts
+Bonus de podio al finalizar el torneo
+Criterios de desempate (en orden de prioridad)
+Prioridad
+Criterio
+Alcance
+1°
+Mayor cantidad de resultados exactos totales
+Todas las fases
+2°
+Mayor cantidad de posiciones de grupo acertadas
+Solo fase de grupos
+3°
+Mayor cantidad de puntos en fase eliminatoria
+16avos a Final
+4°
+División del premio
+Si persiste la igualdad
+2. Módulo de Roles
+Rol Usuario (Jugador)
+Acceso exclusivo a sus propios pronósticos
+Acceso a la tabla de posiciones general (siempre visible)
+Acceso a los pronósticos de otros participantes solo después de la fecha/hora habilitada por el admin
+No puede ver ni modificar los pronósticos de ningún otro usuario
+Rol Administrador
+No participa como jugador
+Acceso completo a todas las configuraciones del sistema
+Puede ver los pronósticos de cualquier usuario en cualquier momento, sin restricción de fecha
+Puede modificar los resultados cargados por cualquier usuario en cualquier momento
+Puede corregir resultados reales obtenidos de la API (con registro de quién y cuándo lo hizo)
+Acceso al panel de administración protegido por rol; inaccesible para usuarios comunes
+3. Módulo de Usuarios
+Registro
+Campos obligatorios: nombre, apellido, mail y teléfono
+Creación de nombre de usuario y contraseña propios
+Validación de mail único: no se permiten dos cuentas con el mismo mail
+Validación de formato de mail y teléfono
+Confirmación de contraseña al momento del registro
+Login / Sesión
+Inicio de sesión con usuario y contraseña
+Cierre de sesión
+Recuperación de contraseña por mail
+Sesiones con expiración automática
+Perfil
+Vista de los propios datos personales
+Posibilidad de editar nombre, apellido y teléfono
+El mail y el nombre de usuario no son modificables una vez registrados
+4. Módulo de Fase de Grupos — Pronósticos
+Carga de partidos
+48 partidos organizados visualmente por grupo (12 grupos de 4 equipos: A a L)
+Por cada partido: input numérico de goles del equipo local y goles del equipo visitante
+Solo se aceptan números enteros mayores o iguales a 0
+Visualización clara de escudos y nombres de los equipos en cada partido
+Cálculo automático de posiciones
+Las posiciones 1°/2°/3°/4° de cada grupo NO las elige el usuario: el sistema las calcula automáticamente
+Se aplican los criterios oficiales de clasificación del Mundial 2026 (reglamento FIFA vigente):
+Puntos (victoria = 3, empate = 1, derrota = 0)
+Diferencia de goles en los partidos del grupo
+Goles a favor en los partidos del grupo
+Resultado del enfrentamiento directo entre los equipos empatados
+Diferencia de goles en el enfrentamiento directo
+Goles a favor en el enfrentamiento directo
+Sorteo (caso extremo, no configurable por el usuario)
+Las posiciones calculadas se muestran al usuario ANTES de confirmar el envío, para que pueda revisarlas
+Envío y bloqueo
+Botón 'Confirmar envío' que valida que los 48 partidos estén completos
+Si hay campos vacíos: indicar exactamente cuáles faltan y bloquear el envío
+Una vez enviado: todos los campos quedan en modo lectura, no editables bajo ninguna circunstancia
+Se registra y muestra la fecha y hora exacta en que el usuario realizó el envío
+Fecha límite
+Configurable por el admin (debe ser antes del primer partido del Mundial)
+Si la fecha límite pasó y el usuario NO envió: mostrar mensaje de tiempo agotado y bloquear el formulario vacío
+Si la fecha límite pasó y el usuario SÍ envió: mostrar sus datos en modo lectura normalmente
+5. Módulo de Fase Eliminatoria — Pronósticos
+Estructura y habilitación
+La fase eliminatoria consta de 31 partidos: 16avos (16), 8vos (8), cuartos (4), semifinales (2), 3er puesto (1) y final (1)
+El cuadro eliminatorio se construye automáticamente desde la API con los cruces reales
+Se divide en dos partes con lógicas de habilitación distintas:
+Primera parte — 1er partido de 16avos de final
+Se habilita automáticamente en cuanto la API detecta que ese cruce está definido (2° Grupo A vs 2° Grupo B)
+El usuario puede cargar solo ese partido desde el momento en que se habilita
+Se bloquea una hora antes del inicio de ese partido
+Segunda parte — Resto de la fase eliminatoria
+Se habilita cuando la API confirma que la fase de grupos terminó completamente y los 15 cruces restantes de 16avos están definidos
+El usuario debe enviar TODOS los partidos restantes (desde el 2do partido de 16avos hasta la final) de forma completa
+Fecha límite: una hora antes del segundo partido de 16avos de final (configurable por el admin, coincide con ese momento)
+Si no se envía antes de la fecha límite: toda la segunda parte queda anulada (0 puntos)
+Lógica del 1er partido de 16avos no enviado a tiempo
+⚠ Esta es la regla más particular de la Fase 2. Ver tabla a continuación:
+Situación
+Consecuencia
+Envió el 1er partido de 16avos antes del cierre
+Todo normal, puntaje completo disponible
+No envió el 1er partido de 16avos antes del cierre
+Ese partido = 0 pts. En 8vos, el sistema asigna automáticamente el perdedor real del partido, sin posibilidad de elección por parte del usuario
+No envió la 2da parte completa antes de la fecha límite
+Toda la Fase 2 (excepto el 1er partido) queda anulada = 0 pts
+Envió todos los partidos desde 16avos hasta la final antes del cierre
+Todo normal, puntaje completo disponible
+Cuadro eliminatorio
+Se muestra el cuadro completo real obtenido desde la API
+La segunda parte se habilita únicamente cuando la API confirma que los 15 cruces restantes de 16avos están todos definidos.
+Carga por partido
+Por cada partido: input numérico de goles a 120' de ambos equipos
+Se aclara explícitamente que el resultado es incluyendo prórroga y ANTES de penales
+Por cada partido: selector OBLIGATORIO de ganador por penales con los dos equipos como únicas opciones
+No existe opción vacía ni 'ninguno' en el selector de penales
+El selector es obligatorio aunque el usuario crea que el partido no llegará a esa instancia
+Envío y bloqueo
+Validación de campos vacíos idéntica a Fase 1: si falta algo, no se permite enviar
+Una vez enviados los partidos, no se pueden modificar bajo ninguna circunstancia
+Se registra y muestra la fecha y hora exacta del envío
+6. Motor de Puntuación
+Puntos Fase de Grupos
+Resultado exacto (goles exactos a 90'): +3 puntos
+Ganador o empate correcto pero no exacto: +1 punto
+Por cada equipo ubicado en posición exacta de su grupo (posición calculada vs. clasificación real de la API): +2 puntos
+Máximo evaluable: 4 equipos × 12 grupos = 48 comparaciones de posición
+Puntos Fase Eliminatoria
+Resultado exacto a 120' (incluyendo prórroga): +3 puntos
+Ganador o empate correcto a 120' (no exacto): +1 punto
+Ganador por penales correcto: +1 punto — solo si el partido real llegó efectivamente a penales
+Bonus posicionamiento: +1 punto si el equipo que ganó el partido real fue clasificado por el usuario en esa misma posición de grupo en Fase 1
+Bonus de Podio
+Campeón exacto: +15 puntos
+Subcampeón exacto: +8 puntos
+Tercer puesto exacto: +5 puntos
+Cuarto puesto exacto: +3 puntos
+Se calculan automáticamente al finalizar el torneo
+Recálculo automático
+Los puntos de cada usuario se recalculan automáticamente cada vez que la API reporta un nuevo resultado real
+Al corregir manualmente un resultado real (admin), todos los puntajes afectados se recalculan en cascada
+Los datos originales de pronósticos nunca se pisan: el puntaje siempre es recalculable desde cero
+7. Módulo de Integración con API Externa
+Datos que se obtienen de la API
+Lista completa de los 48 partidos de fase de grupos: fecha, hora, estadio, equipos y resultado final
+Estado de cada partido: no iniciado / en curso / finalizado
+Clasificados reales de cada grupo al finalizar la fase: posiciones 1°, 2°, 3°, 4°
+Cruces de cada ronda eliminatoria (qué equipos juegan cada partido)
+Resultados de cada partido eliminatorio: a 90', a 120', si hubo penales y quién ganó
+Ganador del Mundial, subcampeón, tercer puesto y cuarto puesto
+Comportamiento del sistema
+Consulta periódica a la API cada 5 minutos durante días de partido
+Al detectar un partido finalizado: calcular y guardar los puntos de todos los usuarios para ese partido
+Al detectar que el primer cruce de 16avos está definido: habilitar automáticamente la primera parte de la Fase 2
+Al confirmar que los 15 cruces restantes de 16avos están definidos: habilitar la carga de pronósticos de la segunda parte de la Fase 2.
+A medida que la API confirma nuevos cruces, estos se muestran en el cuadro eliminatorio en modo lectura. La habilitación para cargar pronósticos de la segunda parte ocurre únicamente cuando los 15 cruces restantes de 16avos están todos definidos.
+Manejo de errores
+Si la API no responde: mostrar los últimos datos disponibles sin interrumpir el funcionamiento de la app
+Log de errores de API visible para el administrador
+8. Módulo de Administración
+Configuración de fechas y habilitaciones
+Fecha y hora límite para el envío de Fase 1 (antes del primer partido del Mundial)
+Fecha y hora límite para la primera parte de Fase 2 (idealmente automática por API, coincide con una hora antes del 1er partido de 16avos)
+Fecha y hora límite para la segunda parte de Fase 2 (idealmente automática por API, coincide con una hora antes del 2do partido de 16avos)
+Fecha y hora a partir de la cual los usuarios pueden ver los pronósticos de otros participantes (configuración manual)
+Posibilidad de modificar cualquiera de estas fechas antes de que lleguen
+Gestión de participantes
+Lista de todos los usuarios registrados con nombre, mail, teléfono y estado de envíos
+Estado de cada usuario: si envió Fase 1, si envió Fase 2
+Posibilidad de eliminar un usuario
+El admin puede modificar los resultados cargados por cualquier usuario en cualquier momento
+Gestión de resultados reales
+Vista de todos los resultados reales cargados desde la API
+Posibilidad de corregir manualmente un resultado real en caso de error de la API
+Toda corrección manual queda registrada: quién la hizo y cuándo
+Al corregir un resultado real, todos los puntajes afectados se recalculan automáticamente
+Configuración de la API
+Ingreso y almacenamiento seguro de la API key
+Indicador de estado de la conexión con la API
+Botón para forzar una sincronización manual
+9. Módulo de Tabla de Posiciones
+Visible para todos los usuarios en todo momento, incluso antes de enviar sus propios pronósticos
+Muestra: posición, nombre y apellido del participante, puntaje total y estado de envío
+Ordenada por puntaje descendente con los cuatro criterios de desempate aplicados
+Indicación visual cuando hay empate técnico entre dos o más participantes
+Se actualiza automáticamente cuando se calculan nuevos puntos
+Al hacer clic en un participante: ver puntaje desglosado (grupos, eliminatoria, bonus de podio)
+10. Módulo de Visualización de Pronósticos Ajenos
+Bloqueado hasta la fecha/hora habilitada por el admin
+Mientras está bloqueado: mostrar mensaje indicando cuándo se habilitará
+Una vez habilitado: lista de todos los participantes; al hacer clic en uno se ven todos sus pronósticos
+Vista detallada por partido: resultado que puso el participante, resultado real y puntos obtenidos
+El admin puede ver los pronósticos de todos en cualquier momento, sin restricción de fecha
+11. Requisitos Generales
+Diseño y usabilidad
+Totalmente responsive: funciona correctamente en celular, tablet y computadora
+Navegación clara entre secciones: Fase 1, Fase 2, Tabla de posiciones, Mi perfil
+Indicadores visuales del estado de cada sección: bloqueada / abierta / enviada / cerrada / tiempo agotado
+Seguridad
+Contraseñas almacenadas encriptadas (nunca en texto plano)
+Sesiones con expiración automática
+Las rutas del panel admin son inaccesibles para usuarios con rol jugador
+Ningún usuario puede ver ni modificar los pronósticos de otro usuario, excepto el administrador
+Consistencia de datos
+Todos los envíos registran fecha y hora exacta en la base de datos
+Ningún pronóstico enviado puede ser modificado por el usuario que lo cargó
+Los datos originales de pronósticos nunca se sobreescriben: el puntaje siempre es recalculable desde cero

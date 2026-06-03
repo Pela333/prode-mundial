@@ -105,6 +105,7 @@ export async function recalcPointsForMatch(supabase: SupabaseClient, matchId: st
   // Sólo aplica si phase !== 'group'.
   let winnerTeam: string | null = null
   let userGroupStandings: Map<string, Map<string, number>> | null = null
+  let realPos: number | null = null
 
   if (r.phase !== 'group') {
     // Quién ganó realmente? Si fue a penales, pen_winner; si no, comparar 120'
@@ -124,6 +125,16 @@ export async function recalcPointsForMatch(supabase: SupabaseClient, matchId: st
       // Cargamos las predicciones de fase de grupos de TODOS los usuarios afectados
       const userIds = [...new Set((predictions as PredictionRow[]).map(p => p.user_id))]
       userGroupStandings = await computeUserStandingsBatch(supabase, userIds)
+
+      // Cargar la posición real del ganador en group_standings
+      const { data: realStanding } = await supabase
+        .from('group_standings')
+        .select('position')
+        .eq('team', winnerTeam)
+        .maybeSingle()
+      if (realStanding) {
+        realPos = realStanding.position
+      }
     }
   }
 
@@ -143,15 +154,12 @@ export async function recalcPointsForMatch(supabase: SupabaseClient, matchId: st
       bonus_points += 1
     }
 
-    // Bonus posicionamiento elim: ganador real estuvo en esa posición de grupo en el pronóstico del usuario
-    if (p.phase !== 'group' && winnerTeam && userGroupStandings) {
+    // Bonus posicionamiento elim: ganador real estuvo en esa misma posición de grupo en el pronóstico del usuario
+    if (p.phase !== 'group' && winnerTeam && realPos != null && userGroupStandings) {
       const userPositions = userGroupStandings.get(p.user_id)
       if (userPositions) {
-        // Si el ganador real estaba puesto por el usuario en alguna posición de su grupo, suma +1
-        // (la "misma posición" en spec se interpreta como cualquier posición que el usuario predijo;
-        // re-leer la spec: "el ganador real fue clasificado en esa posición por el usuario" — en práctica,
-        // significa que el usuario predijo a ese equipo COMO clasificado de su grupo)
-        if (userPositions.has(winnerTeam)) {
+        const userPos = userPositions.get(winnerTeam)
+        if (userPos != null && userPos === realPos) {
           bonus_points += 1
         }
       }
@@ -314,4 +322,153 @@ async function computeUserStandingsBatch(
   }
 
   return result
+}
+
+/**
+ * Recalcula los puntos de todas las predictions de un usuario contra los resultados finalizados en DB,
+ * y actualiza el group position bonus si aplica.
+ */
+export async function recalcPointsForUser(supabase: SupabaseClient, userId: string): Promise<number> {
+  const { data: results } = await supabase
+    .from('results')
+    .select('*')
+    .eq('status', 'finished')
+
+  if (!results || results.length === 0) return 0
+
+  const matchIds = results.map(r => r.match_id)
+  const { data: predictions } = await supabase
+    .from('predictions')
+    .select('id, user_id, match_id, phase, home_score, away_score, home_score_120, away_score_120, pen_winner')
+    .eq('user_id', userId)
+    .in('match_id', matchIds)
+
+  if (!predictions || predictions.length === 0) return 0
+
+  let userGroupStandings: Map<string, Map<string, number>> | null = null
+  const hasElim = predictions.some(p => p.phase !== 'group')
+  if (hasElim) {
+    userGroupStandings = await computeUserStandingsBatch(supabase, [userId])
+  }
+
+  const { data: realStandings } = await supabase
+    .from('group_standings')
+    .select('team, position, finalized, group_id')
+  const realPosMap = new Map<string, number>()
+  for (const row of realStandings ?? []) {
+    realPosMap.set(row.team, row.position)
+  }
+
+  let bracketMap = new Map<string, { home_team: string | null; away_team: string | null }>()
+  if (hasElim) {
+    const { data: brackets } = await supabase
+      .from('bracket')
+      .select('match_id, home_team, away_team')
+      .in('match_id', matchIds)
+    bracketMap = new Map((brackets ?? []).map(b => [b.match_id, b]))
+  }
+
+  const updates: { id: string; result_points: number; bonus_points: number }[] = []
+  const resultMap = new Map(results.map(r => [r.match_id, r]))
+
+  for (const p of predictions as PredictionRow[]) {
+    const r = resultMap.get(p.match_id)
+    if (!r) continue
+
+    const result_points = pointsForResult(
+      p.phase,
+      p.home_score, p.away_score, p.home_score_120, p.away_score_120,
+      r.home_score, r.away_score, r.home_score_120, r.away_score_120,
+    )
+
+    let bonus_points = 0
+
+    if (p.phase !== 'group' && r.went_to_pens && r.pen_winner && p.pen_winner === r.pen_winner) {
+      bonus_points += 1
+    }
+
+    if (p.phase !== 'group' && userGroupStandings) {
+      let winnerTeam: string | null = null
+      if (r.went_to_pens && r.pen_winner) {
+        winnerTeam = r.pen_winner
+      } else if (r.home_score_120 != null && r.away_score_120 != null) {
+        const bracketRow = bracketMap.get(p.match_id)
+        if (bracketRow) {
+          if (r.home_score_120 > r.away_score_120 && bracketRow.home_team) winnerTeam = bracketRow.home_team
+          else if (r.home_score_120 < r.away_score_120 && bracketRow.away_team) winnerTeam = bracketRow.away_team
+        }
+      }
+
+      if (winnerTeam) {
+        const realPos = realPosMap.get(winnerTeam)
+        const userPositions = userGroupStandings.get(userId)
+        if (realPos != null && userPositions) {
+          const userPos = userPositions.get(winnerTeam)
+          if (userPos != null && userPos === realPos) {
+            bonus_points += 1
+          }
+        }
+      }
+    }
+
+    updates.push({ id: p.id, result_points, bonus_points })
+  }
+
+  await Promise.all(
+    updates.map(u =>
+      supabase.from('predictions')
+        .update({ result_points: u.result_points, bonus_points: u.bonus_points })
+        .eq('id', u.id)
+    )
+  )
+
+  await recalcGroupPositionBonusForUser(supabase, userId, realStandings, userGroupStandings)
+
+  return updates.length
+}
+
+async function recalcGroupPositionBonusForUser(
+  supabase: SupabaseClient,
+  userId: string,
+  realStandings: { group_id?: string; team: string; position: number; finalized?: boolean }[] | null,
+  userGroupStandings: Map<string, Map<string, number>> | null
+): Promise<void> {
+  let standings = realStandings
+  if (!standings) {
+    const { data } = await supabase
+      .from('group_standings')
+      .select('group_id, position, team, finalized')
+    standings = data
+  }
+
+  if (!standings || standings.length === 0) return
+  const allFinalized = standings.length === 48 && standings.every((r: any) => r.finalized)
+  if (!allFinalized) return
+
+  const realByGroup = new Map<string, Map<string, number>>()
+  for (const r of standings as any[]) {
+    if (!realByGroup.has(r.group_id)) realByGroup.set(r.group_id, new Map())
+    realByGroup.get(r.group_id)!.set(r.team, r.position)
+  }
+
+  let userPred = userGroupStandings
+  if (!userPred) {
+    userPred = await computeUserStandingsBatch(supabase, [userId])
+  }
+
+  const userPositions = userPred.get(userId)
+  if (!userPositions) {
+    await supabase.from('user_bonus').upsert({ user_id: userId, type: 'group_position', points: 0 }, { onConflict: 'user_id,type' })
+    return
+  }
+
+  let pts = 0
+  for (const [groupId, realPositions] of realByGroup) {
+    for (const [team, realPos] of realPositions) {
+      const predPos = userPositions.get(team)
+      if (predPos != null && predPos === realPos) pts += 2
+    }
+  }
+
+  await supabase.from('user_bonus').upsert({ user_id: userId, type: 'group_position', points: pts }, { onConflict: 'user_id,type' })
 }
