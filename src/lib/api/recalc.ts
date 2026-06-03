@@ -95,63 +95,91 @@ function pointsForElimMatch(
     return 0
   }
 
-  // Determine predicted winner
-  let predWinner: string
-  let predWinnerScore: number
-  let predLoserScore: number
-  const predIsDraw = predHomeScore === predAwayScore
-  if (predHomeScore > predAwayScore) {
-    predWinner = predHomeTeam
-    predWinnerScore = predHomeScore
-    predLoserScore = predAwayScore
-  } else if (predHomeScore < predAwayScore) {
-    predWinner = predAwayTeam
-    predWinnerScore = predAwayScore
-    predLoserScore = predHomeScore
-  } else {
-    if (!predPenWinner) return 0
-    predWinner = predPenWinner
-    predWinnerScore = predHomeScore
-    predLoserScore = predAwayScore
-  }
-
-  // Determine real winner
+  // Determine real winner of the match (considering 120' and penalties)
   let realWinner: string
-  let realWinnerScore: number
-  let realLoserScore: number
-  const realIsDraw = realHomeScore === realAwayScore
   if (realWentToPens && realPenWinner) {
     realWinner = realPenWinner
-    realWinnerScore = realHomeScore
-    realLoserScore = realAwayScore
   } else {
     if (realHomeScore > realAwayScore) {
       realWinner = realHomeTeam
-      realWinnerScore = realHomeScore
-      realLoserScore = realAwayScore
     } else {
       realWinner = realAwayTeam
-      realWinnerScore = realAwayScore
-      realLoserScore = realHomeScore
     }
   }
 
-  // If the predicted winner doesn't match the real winner: 0 points
-  if (predWinner !== realWinner) {
+  // Check if both predicted teams match the real teams (home/away or swapped)
+  const bothTeamsMatch =
+    (predHomeTeam === realHomeTeam && predAwayTeam === realAwayTeam) ||
+    (predHomeTeam === realAwayTeam && predAwayTeam === realHomeTeam)
+
+  if (bothTeamsMatch) {
+    // Align predictions to real home/away
+    let alignedPredHomeScore: number
+    let alignedPredAwayScore: number
+
+    if (predHomeTeam === realHomeTeam) {
+      alignedPredHomeScore = predHomeScore
+      alignedPredAwayScore = predAwayScore
+    } else {
+      alignedPredHomeScore = predAwayScore
+      alignedPredAwayScore = predHomeScore
+    }
+
+    // Check exact score at 120'
+    if (alignedPredHomeScore === realHomeScore && alignedPredAwayScore === realAwayScore) {
+      return 3
+    }
+
+    // Check correct outcome at 120' (win/loss/draw)
+    const predIsDraw = alignedPredHomeScore === alignedPredAwayScore
+    const realIsDraw = realHomeScore === realAwayScore
+    const predHomeWon = alignedPredHomeScore > alignedPredAwayScore
+    const realHomeWon = realHomeScore > realAwayScore
+    const predAwayWon = alignedPredHomeScore < alignedPredAwayScore
+    const realAwayWon = realHomeScore < realAwayScore
+
+    if (
+      (predIsDraw && realIsDraw) ||
+      (predHomeWon && realHomeWon) ||
+      (predAwayWon && realAwayWon)
+    ) {
+      return 1
+    }
+
     return 0
   }
 
-  // If predicted 120' outcome (draw or win) doesn't match real 120' outcome: 0 points
-  if (predIsDraw !== realIsDraw) {
-    return 0
+  // Only one team matches
+  const homeMatches = predHomeTeam === realHomeTeam || predHomeTeam === realAwayTeam
+  const awayMatches = predAwayTeam === realHomeTeam || predAwayTeam === realAwayTeam
+
+  if (homeMatches || awayMatches) {
+    const matchingTeam = homeMatches ? predHomeTeam : predAwayTeam
+
+    // Find the role of matchingTeam in real match
+    const realMatchingRole = (matchingTeam === realHomeTeam) ? 'home' : 'away'
+
+    // Align scores
+    const predMatchingScore = (matchingTeam === predHomeTeam) ? predHomeScore : predAwayScore
+    const predOtherScore = (matchingTeam === predHomeTeam) ? predAwayScore : predHomeScore
+
+    const realMatchingScore = (realMatchingRole === 'home') ? realHomeScore : realAwayScore
+    const realOtherScore = (realMatchingRole === 'home') ? realAwayScore : realHomeScore
+
+    // Check if matching team won both in real 120' and in user's 120' prediction
+    const matchingTeamWonReal120 = (realMatchingScore > realOtherScore)
+    const matchingTeamWonPred120 = (predMatchingScore > predOtherScore)
+
+    if (matchingTeamWonReal120 && matchingTeamWonPred120) {
+      // Check exact score
+      if (predMatchingScore === realMatchingScore && predOtherScore === realOtherScore) {
+        return 3
+      }
+      return 1
+    }
   }
 
-  // If they match, check if exact score of winner and loser match
-  if (predWinnerScore === realWinnerScore && predLoserScore === realLoserScore) {
-    return 3
-  }
-
-  return 1
+  return 0
 }
 
 /**
