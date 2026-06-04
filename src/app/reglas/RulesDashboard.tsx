@@ -38,6 +38,8 @@ export default function RulesDashboard() {
   const [realAway, setRealAway] = useState<string>('1')
   const [predPenWinner, setPredPenWinner] = useState<'home' | 'away'>('home')
   const [realPenWinner, setRealPenWinner] = useState<'home' | 'away'>('home')
+  const [teamMatching, setTeamMatching] = useState<'both' | 'one' | 'none'>('both')
+  const [matchingTeamRole, setMatchingTeamRole] = useState<'home' | 'away'>('home')
   const [groupPosBonus, setGroupPosBonus] = useState<boolean>(false)
 
   // Cálculo de puntos del simulador
@@ -51,34 +53,107 @@ export default function RulesDashboard() {
   const predOutcome = predDiff > 0 ? 'home' : predDiff < 0 ? 'away' : 'draw'
   const realOutcome = realDiff > 0 ? 'home' : realDiff < 0 ? 'away' : 'draw'
 
-  const isExact = valPredHome === valRealHome && valPredAway === valRealAway
-  const isOutcome = predOutcome === realOutcome
-
   let simPoints = 0
   const simBreakdown: { label: string; pts: number }[] = []
 
-  if (isExact) {
-    simPoints += 3
-    simBreakdown.push({ label: 'Resultado exacto', pts: 3 })
-  } else if (isOutcome) {
-    simPoints += 1
-    simBreakdown.push({ label: 'Resultado / Ganador correcto (no exacto)', pts: 1 })
-  } else {
-    simBreakdown.push({ label: 'Resultado incorrecto', pts: 0 })
-  }
+  if (simPhase === 'groups') {
+    // Fase de grupos: Ambos coinciden siempre, comparación simple a 90'
+    const isExact = valPredHome === valRealHome && valPredAway === valRealAway
+    const isOutcome = predOutcome === realOutcome
 
-  if (simPhase === 'knockout') {
-    if (realOutcome === 'draw') {
-      if (predPenWinner === realPenWinner) {
-        simPoints += 1
-        simBreakdown.push({ label: 'Ganador de penales correcto', pts: 1 })
-      } else {
-        simBreakdown.push({ label: 'Ganador de penales incorrecto', pts: 0 })
-      }
-    }
-    if (groupPosBonus) {
+    if (isExact) {
+      simPoints += 3
+      simBreakdown.push({ label: 'Resultado exacto', pts: 3 })
+    } else if (isOutcome) {
       simPoints += 1
-      simBreakdown.push({ label: 'Bonus por posicionamiento de grupo', pts: 1 })
+      simBreakdown.push({ label: 'Resultado / Ganador correcto (no exacto)', pts: 1 })
+    } else {
+      simBreakdown.push({ label: 'Resultado incorrecto', pts: 0 })
+    }
+  } else {
+    // Fase eliminatoria (a 120')
+    if (teamMatching === 'none') {
+      simPoints = 0
+      simBreakdown.push({ label: 'Ningún equipo coincide en el cruce', pts: 0 })
+    } else if (teamMatching === 'both') {
+      // Caso 1: Ambos equipos coinciden en el cruce
+      const isExact = valPredHome === valRealHome && valPredAway === valRealAway
+      const isOutcome = predOutcome === realOutcome
+
+      if (isExact) {
+        simPoints += 3
+        simBreakdown.push({ label: "Resultado exacto a 120'", pts: 3 })
+      } else if (isOutcome) {
+        simPoints += 1
+        simBreakdown.push({ label: "Resultado / Ganador correcto a 120' (no exacto)", pts: 1 })
+      } else {
+        simBreakdown.push({ label: "Resultado incorrecto a 120'", pts: 0 })
+      }
+
+      // Ganador por penales (solo si real terminó en empate en los 120')
+      if (realOutcome === 'draw') {
+        if (predPenWinner === realPenWinner) {
+          simPoints += 1
+          simBreakdown.push({ label: 'Ganador de penales correcto', pts: 1 })
+        } else {
+          simBreakdown.push({ label: 'Ganador de penales incorrecto', pts: 0 })
+        }
+      }
+
+      // Bonus posicionamiento: el ganador real avanza, el usuario predijo que avanzaba, y está en posición exacta
+      const predWinner = valPredHome > valPredAway ? 'home' : valPredHome < valPredAway ? 'away' : predPenWinner
+      const realWinner = valRealHome > valRealAway ? 'home' : valRealHome < valRealAway ? 'away' : realPenWinner
+      if (groupPosBonus) {
+        if (predWinner === realWinner) {
+          simPoints += 1
+          simBreakdown.push({ label: 'Bonus posicionamiento (el ganador correcto avanzó y estaba en posición exacta)', pts: 1 })
+        } else {
+          simBreakdown.push({ label: 'Sin bonus posicionamiento (el equipo en posición exacta no avanzó o no fue el predicho)', pts: 0 })
+        }
+      }
+    } else {
+      // Caso 2: Solo un equipo coincide en el cruce
+      const matchingTeamWonReal = (matchingTeamRole === 'home' && valRealHome > valRealAway) ||
+                                  (matchingTeamRole === 'away' && valRealAway > valRealHome) ||
+                                  (realOutcome === 'draw' && realPenWinner === matchingTeamRole)
+
+      const matchingTeamWonPred = (matchingTeamRole === 'home' && valPredHome > valPredAway) ||
+                                  (matchingTeamRole === 'away' && valPredAway > valPredHome) ||
+                                  (predOutcome === 'draw' && predPenWinner === matchingTeamRole)
+
+      if (matchingTeamWonReal && matchingTeamWonPred) {
+        // Al estar alineados en que gana el equipo que coincide, comparamos los goles
+        const predMatchingScore = matchingTeamRole === 'home' ? valPredHome : valPredAway
+        const predOtherScore = matchingTeamRole === 'home' ? valPredAway : valPredHome
+        const realMatchingScore = matchingTeamRole === 'home' ? valRealHome : valRealAway
+        const realOtherScore = matchingTeamRole === 'home' ? valRealAway : valRealHome
+
+        if (predMatchingScore === realMatchingScore && predOtherScore === realOtherScore) {
+          simPoints += 3
+          simBreakdown.push({ label: 'Resultado exacto a favor del equipo que coincide', pts: 3 })
+        } else {
+          simPoints += 1
+          simBreakdown.push({ label: 'Resultado/Ganador simple a favor del equipo que coincide (no exacto)', pts: 1 })
+        }
+
+        // Ganador por penales: si fue a penales y el que coincide ganó penales real y predicho
+        if (realOutcome === 'draw') {
+          if (predPenWinner === realPenWinner && realPenWinner === matchingTeamRole) {
+            simPoints += 1
+            simBreakdown.push({ label: 'Ganador por penales correcto (equipo coincidente)', pts: 1 })
+          } else {
+            simBreakdown.push({ label: 'Ganador de penales incorrecto o no coincidente', pts: 0 })
+          }
+        }
+
+        // Bonus posicionamiento: como el coincidente ganó y el usuario predijo que ganaba, si está en pos exacta suma +1
+        if (groupPosBonus) {
+          simPoints += 1
+          simBreakdown.push({ label: 'Bonus posicionamiento (el equipo coincidente en posición exacta avanzó)', pts: 1 })
+        }
+      } else {
+        simBreakdown.push({ label: 'El equipo que coincide no ganó o no fue pronosticado como ganador', pts: 0 })
+      }
     }
   }
 
@@ -386,6 +461,65 @@ export default function RulesDashboard() {
                 </div>
               </div>
 
+              {/* Coincidencia de Equipos (Solo en eliminatorias) */}
+              {simPhase === 'knockout' && (
+                <div className="space-y-3 bg-[#0a0f1e] p-5 rounded-2xl border border-white/5">
+                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                    Coincidencia de Equipos en el Cruce
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: 'both', label: 'Ambos coinciden' },
+                      { id: 'one', label: 'Solo uno coincide' },
+                      { id: 'none', label: 'Ninguno coincide' }
+                    ].map(opt => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setTeamMatching(opt.id as any)}
+                        className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
+                          teamMatching === opt.id
+                            ? 'bg-amber-500/10 border-amber-500 text-amber-400'
+                            : 'bg-white/2 border-white/5 text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Sub-selector para Solo uno coincide */}
+                  {teamMatching === 'one' && (
+                    <div className="pt-3 border-t border-white/5 flex items-center justify-between gap-4">
+                      <div>
+                        <span className="text-xs font-bold text-white block">¿Cuál es el equipo coincidente?</span>
+                        <span className="text-[10px] text-slate-500">El equipo que pusiste que coincide con el real.</span>
+                      </div>
+                      <div className="flex rounded-lg bg-white/5 p-1 border border-white/5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setMatchingTeamRole('home')}
+                          className={`px-3 py-1 rounded-md text-[10px] font-semibold cursor-pointer ${
+                            matchingTeamRole === 'home' ? 'bg-amber-500 text-black' : 'text-slate-400'
+                          }`}
+                        >
+                          Local
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMatchingTeamRole('away')}
+                          className={`px-3 py-1 rounded-md text-[10px] font-semibold cursor-pointer ${
+                            matchingTeamRole === 'away' ? 'bg-amber-500 text-black' : 'text-slate-400'
+                          }`}
+                        >
+                          Visita
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Contenedor Pronóstico vs Real */}
               <div className="grid grid-cols-2 gap-6 bg-[#0a0f1e] p-5 rounded-2xl border border-white/5">
                 {/* Pronóstico */}
@@ -420,7 +554,7 @@ export default function RulesDashboard() {
                   </div>
 
                   {/* Selector de Penales Pronosticado (Siempre Requerido en Eliminatoria) */}
-                  {simPhase === 'knockout' && (
+                  {simPhase === 'knockout' && teamMatching !== 'none' && (
                     <div className="space-y-1.5 pt-4 border-t border-white/5 mt-4">
                       <label className="text-[11px] text-slate-400 block font-semibold text-center">Ganador Penales Pronosticado</label>
                       <select
@@ -468,7 +602,7 @@ export default function RulesDashboard() {
                   </div>
 
                   {/* Selector de Penales Real (Solo si hay empate real) */}
-                  {simPhase === 'knockout' && realOutcome === 'draw' && (
+                  {simPhase === 'knockout' && teamMatching !== 'none' && realOutcome === 'draw' && (
                     <div className="space-y-1.5 pt-4 border-t border-white/5 mt-4">
                       <label className="text-[11px] text-green-400 block font-semibold text-center">Ganador Penales Real</label>
                       <select
@@ -484,7 +618,7 @@ export default function RulesDashboard() {
                   )}
 
                   {/* Tip informativo para penales si no hay empate real */}
-                  {simPhase === 'knockout' && realOutcome !== 'draw' && (
+                  {simPhase === 'knockout' && teamMatching !== 'none' && realOutcome !== 'draw' && (
                     <div className="text-[10px] text-slate-400 bg-white/3 p-2.5 rounded-xl border border-white/5 mt-4">
                       💡 <strong>Tanda de Penales:</strong> Solo ocurre si el Resultado Real es un empate (ej. 1-1). Al empatar, aparecerá aquí el selector del ganador real.
                     </div>
@@ -493,7 +627,7 @@ export default function RulesDashboard() {
               </div>
 
               {/* Bonus de grupo (Solo en eliminatoria) */}
-              {simPhase === 'knockout' && (
+              {simPhase === 'knockout' && teamMatching !== 'none' && (
                 <div className="space-y-4 pt-2 border-t border-white/5">
                   <div className="flex items-center justify-between p-4 rounded-xl bg-[#0a0f1e] border border-white/5">
                     <div>
@@ -515,6 +649,7 @@ export default function RulesDashboard() {
                   </div>
                 </div>
               )}
+
 
               {simPhase === 'groups' && (
                 <div className="text-xs text-slate-500 bg-[#0a0f1e] p-4 rounded-xl border border-white/5">
