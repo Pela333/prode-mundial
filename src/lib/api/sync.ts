@@ -65,7 +65,7 @@ function buildBracketIndex(): Map<string, { id: string; phase: Phase; position: 
 /**
  * Convierte un partido de la API en un payload normalizado para upsertear en `results`.
  */
-function apiMatchToResult(m: ApiMatch, matchId: string, phase: Phase) {
+function apiMatchToResult(m: ApiMatch, matchId: string, phase: Phase, overriddenMap: Map<string, any>) {
   const finished = m.status === 'FINISHED'
   const went_to_pens = finished && m.score.duration === 'PENALTY_SHOOTOUT'
 
@@ -77,32 +77,49 @@ function apiMatchToResult(m: ApiMatch, matchId: string, phase: Phase) {
   const home_full = m.score.fullTime?.home ?? null
   const away_full = m.score.fullTime?.away ?? null
 
+  const isOverridden = overriddenMap.has(matchId)
+  const o = overriddenMap.get(matchId)
+
   let home_score: number | null = null
   let away_score: number | null = null
   let home_score_120: number | null = null
   let away_score_120: number | null = null
-
-  if (phase === 'group') {
-    home_score = home_full
-    away_score = away_full
-  } else {
-    home_score_120 = home_full
-    away_score_120 = away_full
-  }
-
-  // Detección de pen_winner (sólo si duration === PENALTY_SHOOTOUT)
   let pen_winner: string | null = null
-  if (went_to_pens && m.score.penalties) {
-    if (m.score.penalties.home != null && m.score.penalties.away != null) {
-      if (m.score.penalties.home > m.score.penalties.away) {
+  let went_to_pens_val = went_to_pens
+  let status_val = finished ? 'finished'
+                  : m.status === 'IN_PLAY' || m.status === 'PAUSED' ? 'in_progress'
+                  : 'scheduled'
+
+  if (isOverridden && o) {
+    home_score = o.home_score
+    away_score = o.away_score
+    home_score_120 = o.home_score_120
+    away_score_120 = o.away_score_120
+    went_to_pens_val = o.went_to_pens
+    pen_winner = o.pen_winner
+    status_val = o.status
+  } else {
+    if (phase === 'group') {
+      home_score = home_full
+      away_score = away_full
+    } else {
+      home_score_120 = home_full
+      away_score_120 = away_full
+    }
+
+    // Detección de pen_winner (sólo si duration === PENALTY_SHOOTOUT)
+    if (went_to_pens && m.score.penalties) {
+      if (m.score.penalties.home != null && m.score.penalties.away != null) {
+        if (m.score.penalties.home > m.score.penalties.away) {
+          pen_winner = apiTeamToFixture(m.homeTeam.name)
+        } else if (m.score.penalties.away > m.score.penalties.home) {
+          pen_winner = apiTeamToFixture(m.awayTeam.name)
+        }
+      } else if (m.score.winner === 'HOME_TEAM') {
         pen_winner = apiTeamToFixture(m.homeTeam.name)
-      } else if (m.score.penalties.away > m.score.penalties.home) {
+      } else if (m.score.winner === 'AWAY_TEAM') {
         pen_winner = apiTeamToFixture(m.awayTeam.name)
       }
-    } else if (m.score.winner === 'HOME_TEAM') {
-      pen_winner = apiTeamToFixture(m.homeTeam.name)
-    } else if (m.score.winner === 'AWAY_TEAM') {
-      pen_winner = apiTeamToFixture(m.awayTeam.name)
     }
   }
 
@@ -113,11 +130,10 @@ function apiMatchToResult(m: ApiMatch, matchId: string, phase: Phase) {
     away_score,
     home_score_120,
     away_score_120,
-    went_to_pens,
+    went_to_pens: went_to_pens_val,
     pen_winner,
-    status: m.status === 'FINISHED' ? 'finished'
-            : m.status === 'IN_PLAY' || m.status === 'PAUSED' ? 'in_progress'
-            : 'scheduled',
+    status: status_val,
+    manual_override: isOverridden,
     api_home_score: phase === 'group' ? home_full : null,
     api_away_score: phase === 'group' ? away_full : null,
     api_home_score_120: phase === 'group' ? null : home_full,
@@ -141,6 +157,13 @@ export async function syncFromApi(supabase: SupabaseClient): Promise<SyncReport>
     recalculatedPredictions: 0,
     errors: [],
   }
+
+  // Cargar overrides manuales existentes para no pisarlos
+  const { data: overridden } = await supabase
+    .from('results')
+    .select('match_id, home_score, away_score, home_score_120, away_score_120, went_to_pens, pen_winner, status')
+    .eq('manual_override', true)
+  const overriddenMap = new Map((overridden ?? []).map(r => [r.match_id, r]))
 
   let matchesPayload: ApiMatch[] = []
   let standingsTables: Awaited<ReturnType<typeof fetchWorldCupStandings>>['data']['standings'] = []
@@ -216,7 +239,7 @@ export async function syncFromApi(supabase: SupabaseClient): Promise<SyncReport>
       continue
     }
     matchIdMap.set(m.id, fixtureMatch.id)
-    groupResults.push(apiMatchToResult(m, fixtureMatch.id, 'group'))
+    groupResults.push(apiMatchToResult(m, fixtureMatch.id, 'group', overriddenMap))
   }
 
   if (groupResults.length > 0) {
@@ -263,7 +286,7 @@ export async function syncFromApi(supabase: SupabaseClient): Promise<SyncReport>
 
       // Sólo persistimos result si el partido tiene equipos definidos (sino no tiene sentido)
       if (defined) {
-        elimResults.push(apiMatchToResult(m, slot.id, phase))
+        elimResults.push(apiMatchToResult(m, slot.id, phase, overriddenMap))
       }
     })
   }

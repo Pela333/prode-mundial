@@ -20,6 +20,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { GROUPS, MATCHES, type Phase } from '@/lib/fixture'
 import { computeGroupStandings, type GroupMatch } from '@/lib/standings'
+import { createAdminClient } from '@/lib/supabase/admin'
 
 interface ResultRow {
   match_id: string
@@ -408,7 +409,8 @@ export async function recalcGroupPositionBonus(supabase: SupabaseClient): Promis
   }
 
   if (upserts.length > 0) {
-    const { error } = await supabase.from('user_bonus').upsert(upserts, { onConflict: 'user_id,type' })
+    const admin = createAdminClient()
+    const { error } = await admin.from('user_bonus').upsert(upserts, { onConflict: 'user_id,type' })
     if (error) throw new Error(`recalcGroupPositionBonus: ${error.message}`)
   }
   return upserts.length
@@ -668,7 +670,8 @@ async function recalcGroupPositionBonusForUser(
 
   const userPositions = userPred.get(userId)
   if (!userPositions) {
-    await supabase.from('user_bonus').upsert({ user_id: userId, type: 'group_position', points: 0 }, { onConflict: 'user_id,type' })
+    const admin = createAdminClient()
+    await admin.from('user_bonus').upsert({ user_id: userId, type: 'group_position', points: 0 }, { onConflict: 'user_id,type' })
     return
   }
 
@@ -680,7 +683,8 @@ async function recalcGroupPositionBonusForUser(
     }
   }
 
-  await supabase.from('user_bonus').upsert({ user_id: userId, type: 'group_position', points: pts }, { onConflict: 'user_id,type' })
+  const admin = createAdminClient()
+  await admin.from('user_bonus').upsert({ user_id: userId, type: 'group_position', points: pts }, { onConflict: 'user_id,type' })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -932,7 +936,8 @@ export async function recalcPodiumBonus(supabase: SupabaseClient): Promise<numbe
   }
 
   if (upserts.length > 0) {
-    const { error } = await supabase.from('user_bonus').upsert(upserts, { onConflict: 'user_id,type' })
+    const admin = createAdminClient()
+    const { error } = await admin.from('user_bonus').upsert(upserts, { onConflict: 'user_id,type' })
     if (error) throw new Error(`recalcPodiumBonus: ${error.message}`)
   }
 
@@ -948,7 +953,8 @@ export async function recalcPodiumBonusForUser(supabase: SupabaseClient, userId:
     .maybeSingle()
 
   if (!sub) {
-    await supabase.from('user_bonus').delete().eq('user_id', userId).like('type', 'podium_%')
+    const admin = createAdminClient()
+    await admin.from('user_bonus').delete().eq('user_id', userId).like('type', 'podium_%')
     return
   }
 
@@ -1001,6 +1007,7 @@ export async function recalcPodiumBonusForUser(supabase: SupabaseClient, userId:
     { user_id: userId, type: 'podium_fourth', points: ptsFourth },
   ]
 
-  const { error } = await supabase.from('user_bonus').upsert(upserts, { onConflict: 'user_id,type' })
+  const admin = createAdminClient()
+  const { error } = await admin.from('user_bonus').upsert(upserts, { onConflict: 'user_id,type' })
   if (error) throw new Error(`recalcPodiumBonusForUser: ${error.message}`)
 }
