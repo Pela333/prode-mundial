@@ -23,8 +23,8 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { MATCHES, BRACKET_SLOTS, type Phase } from '@/lib/fixture'
-import { computeGroupStandings, type GroupMatch } from '@/lib/standings'
+import { GROUPS, MATCHES, BRACKET_SLOTS, type Phase } from '@/lib/fixture'
+import { computeGroupStandings, computeDetailedLiveStandings, type GroupMatch } from '@/lib/standings'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mapping interno: R32 slot → { home, away } en términos de grupo+posición
@@ -281,9 +281,72 @@ export interface BracketDeriveReport {
   errors: string[]
 }
 
+export async function recalculateRealGroupStandings(supabase: SupabaseClient): Promise<void> {
+  const { data: dbGroupResults, error: dbGroupResultsError } = await supabase
+    .from('results')
+    .select('match_id, home_score, away_score, status')
+    .eq('phase', 'group')
+
+  if (dbGroupResultsError) {
+    throw new Error(`recalculateRealGroupStandings: error fetching results: ${dbGroupResultsError.message}`)
+  }
+
+  const resultsMap = new Map<string, { home_score: number | null; away_score: number | null; status: string }>(
+    (dbGroupResults ?? []).map(r => [r.match_id, r])
+  )
+
+  const standingsUpserts = []
+
+  for (const g of GROUPS) {
+    const gMatchesResults: GroupMatch[] = []
+    let allFinished = true
+
+    for (const m of MATCHES.filter(x => x.group === g.id)) {
+      const res = resultsMap.get(m.id)
+      if (res && res.status === 'finished' && res.home_score !== null && res.away_score !== null) {
+        gMatchesResults.push({
+          match: m,
+          home: res.home_score,
+          away: res.away_score,
+        })
+      } else {
+        allFinished = false
+      }
+    }
+
+    const standing = computeDetailedLiveStandings(g.teams, gMatchesResults)
+    if (standing) {
+      for (const row of standing) {
+        standingsUpserts.push({
+          group_id: g.id,
+          position: row.position,
+          team: row.team,
+          finalized: allFinished,
+        })
+      }
+    }
+  }
+
+  if (standingsUpserts.length > 0) {
+    const { error: upsertError } = await supabase
+      .from('group_standings')
+      .upsert(standingsUpserts, { onConflict: 'group_id,position' })
+
+    if (upsertError) {
+      throw new Error(`recalculateRealGroupStandings: error upserting standings: ${upsertError.message}`)
+    }
+  }
+}
+
 export async function deriveBracketFromResults(supabase: SupabaseClient): Promise<BracketDeriveReport> {
   const report: BracketDeriveReport = {
     r32Slots: 0, r16Slots: 0, qfSlots: 0, sfSlots: 0, finalSlots: 0, thirdSlots: 0, errors: [],
+  }
+
+  try {
+    await recalculateRealGroupStandings(supabase)
+  } catch (err) {
+    report.errors.push((err as Error).message)
   }
 
   // ── 1. Cargar group_standings ────────────────────────────────────────────

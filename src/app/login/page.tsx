@@ -55,7 +55,7 @@ export default function LoginPage() {
         })
         if (res.fieldErrors) { setFieldErrors(res.fieldErrors); return }
         if (res.error) { setError(res.error); return }
-        setSuccess('¡Cuenta creada! Revisá tu email para confirmar y después iniciá sesión.')
+        setSuccess('¡Cuenta creada con éxito! Ya podés iniciar sesión.')
         setMode('login')
         setIdentifier(email)
       }

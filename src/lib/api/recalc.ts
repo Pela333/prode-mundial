@@ -21,6 +21,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { GROUPS, MATCHES, type Phase } from '@/lib/fixture'
 import { computeGroupStandings, type GroupMatch } from '@/lib/standings'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { recalculateRealGroupStandings } from './bracket'
 
 interface ResultRow {
   match_id: string
@@ -366,6 +367,12 @@ export async function recalcAllPoints(supabase: SupabaseClient): Promise<number>
  * y persiste en `user_bonus`.
  */
 export async function recalcGroupPositionBonus(supabase: SupabaseClient): Promise<number> {
+  try {
+    await recalculateRealGroupStandings(supabase)
+  } catch (err) {
+    console.error("Error recalculating group standings in recalcGroupPositionBonus:", err)
+  }
+
   const { data: realStandings } = await supabase
     .from('group_standings')
     .select('group_id, position, team, finalized')
