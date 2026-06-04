@@ -71,24 +71,28 @@ export default function RulesDashboard() {
       simBreakdown.push({ label: 'Resultado incorrecto', pts: 0 })
     }
   } else {
-    // Fase eliminatoria (a 120')
+    // Fase eliminatoria (a 120' + penales + posicionamiento)
     if (teamMatching === 'none') {
       simPoints = 0
-      simBreakdown.push({ label: 'Ningún equipo coincide en el cruce', pts: 0 })
+      simBreakdown.push({ label: 'Ningún equipo coincide en el cruce (0 pts en 120\')', pts: 0 })
     } else if (teamMatching === 'both') {
       // Caso 1: Ambos equipos coinciden en el cruce
       const isExact = valPredHome === valRealHome && valPredAway === valRealAway
       const isOutcome = predOutcome === realOutcome
 
+      let resultPoints120 = 0
+      let label120 = "Resultado incorrecto a 120'"
+
       if (isExact) {
-        simPoints += 3
-        simBreakdown.push({ label: "Resultado exacto a 120'", pts: 3 })
+        resultPoints120 = 3
+        label120 = "Resultado exacto a 120'"
       } else if (isOutcome) {
-        simPoints += 1
-        simBreakdown.push({ label: "Resultado / Ganador correcto a 120' (no exacto)", pts: 1 })
-      } else {
-        simBreakdown.push({ label: "Resultado incorrecto a 120'", pts: 0 })
+        resultPoints120 = 1
+        label120 = "Resultado / Ganador correcto a 120' (no exacto)"
       }
+
+      simPoints += resultPoints120
+      simBreakdown.push({ label: label120, pts: resultPoints120 })
 
       // Ganador por penales (solo si real terminó en empate en los 120')
       if (realOutcome === 'draw') {
@@ -113,46 +117,52 @@ export default function RulesDashboard() {
       }
     } else {
       // Caso 2: Solo un equipo coincide en el cruce
-      const matchingTeamWonReal = (matchingTeamRole === 'home' && valRealHome > valRealAway) ||
-                                  (matchingTeamRole === 'away' && valRealAway > valRealHome) ||
-                                  (realOutcome === 'draw' && realPenWinner === matchingTeamRole)
+      const predMatchingScore = matchingTeamRole === 'home' ? valPredHome : valPredAway
+      const predOtherScore = matchingTeamRole === 'home' ? valPredAway : valPredHome
+      const realMatchingScore = matchingTeamRole === 'home' ? valRealHome : valRealAway
+      const realOtherScore = matchingTeamRole === 'home' ? valRealAway : valRealHome
 
-      const matchingTeamWonPred = (matchingTeamRole === 'home' && valPredHome > valPredAway) ||
-                                  (matchingTeamRole === 'away' && valPredAway > valPredHome) ||
-                                  (predOutcome === 'draw' && predPenWinner === matchingTeamRole)
+      const matchingTeamWonReal120 = realMatchingScore > realOtherScore
+      const matchingTeamWonPred120 = predMatchingScore > predOtherScore
+      const bothDraw = (realMatchingScore === realOtherScore) && (predMatchingScore === predOtherScore)
 
-      if (matchingTeamWonReal && matchingTeamWonPred) {
-        // Al estar alineados en que gana el equipo que coincide, comparamos los goles
-        const predMatchingScore = matchingTeamRole === 'home' ? valPredHome : valPredAway
-        const predOtherScore = matchingTeamRole === 'home' ? valPredAway : valPredHome
-        const realMatchingScore = matchingTeamRole === 'home' ? valRealHome : valRealAway
-        const realOtherScore = matchingTeamRole === 'home' ? valRealAway : valRealHome
+      let resultPoints120 = 0
+      let label120 = 'El equipo que coincide no ganó en 120\' reales o predichos'
 
+      if ((matchingTeamWonReal120 && matchingTeamWonPred120) || bothDraw) {
         if (predMatchingScore === realMatchingScore && predOtherScore === realOtherScore) {
-          simPoints += 3
-          simBreakdown.push({ label: 'Resultado exacto a favor del equipo que coincide', pts: 3 })
+          resultPoints120 = 3
+          label120 = 'Resultado exacto a favor del equipo coincidente'
         } else {
+          resultPoints120 = 1
+          label120 = 'Resultado/Ganador simple a favor del equipo coincidente (no exacto)'
+        }
+      }
+
+      simPoints += resultPoints120
+      simBreakdown.push({ label: label120, pts: resultPoints120 })
+
+      // Ganador por penales: si fue a penales y el que coincide ganó penales real y predicho
+      if (realOutcome === 'draw') {
+        if (predPenWinner === realPenWinner && realPenWinner === matchingTeamRole) {
           simPoints += 1
-          simBreakdown.push({ label: 'Resultado/Ganador simple a favor del equipo que coincide (no exacto)', pts: 1 })
+          simBreakdown.push({ label: 'Ganador por penales correcto (equipo coincidente)', pts: 1 })
+        } else {
+          simBreakdown.push({ label: 'Ganador de penales incorrecto o no coincidente', pts: 0 })
         }
+      }
 
-        // Ganador por penales: si fue a penales y el que coincide ganó penales real y predicho
-        if (realOutcome === 'draw') {
-          if (predPenWinner === realPenWinner && realPenWinner === matchingTeamRole) {
-            simPoints += 1
-            simBreakdown.push({ label: 'Ganador por penales correcto (equipo coincidente)', pts: 1 })
-          } else {
-            simBreakdown.push({ label: 'Ganador de penales incorrecto o no coincidente', pts: 0 })
-          }
-        }
+      // Bonus posicionamiento: como el coincidente ganó y el usuario predijo que ganaba, si está en pos exacta suma +1
+      if (groupPosBonus) {
+        const predWinner = valPredHome > valPredAway ? 'home' : valPredHome < valPredAway ? 'away' : predPenWinner
+        const realWinner = valRealHome > valRealAway ? 'home' : valRealHome < valRealAway ? 'away' : realPenWinner
 
-        // Bonus posicionamiento: como el coincidente ganó y el usuario predijo que ganaba, si está en pos exacta suma +1
-        if (groupPosBonus) {
+        if (predWinner === realWinner && realWinner === matchingTeamRole) {
           simPoints += 1
           simBreakdown.push({ label: 'Bonus posicionamiento (el equipo coincidente en posición exacta avanzó)', pts: 1 })
+        } else {
+          simBreakdown.push({ label: 'Sin bonus posicionamiento (el equipo coincidente no avanzó o no fue el predicho)', pts: 0 })
         }
-      } else {
-        simBreakdown.push({ label: 'El equipo que coincide no ganó o no fue pronosticado como ganador', pts: 0 })
       }
     }
   }

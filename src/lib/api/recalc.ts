@@ -166,11 +166,12 @@ function pointsForElimMatch(
     const realMatchingScore = (realMatchingRole === 'home') ? realHomeScore : realAwayScore
     const realOtherScore = (realMatchingRole === 'home') ? realAwayScore : realHomeScore
 
-    // Check if matching team won both in real 120' and in user's 120' prediction
+    // Check if matching team won both in real 120' and in user's 120' prediction, or both drew
     const matchingTeamWonReal120 = (realMatchingScore > realOtherScore)
     const matchingTeamWonPred120 = (predMatchingScore > predOtherScore)
+    const bothDraw = (realMatchingScore === realOtherScore) && (predMatchingScore === predOtherScore)
 
-    if (matchingTeamWonReal120 && matchingTeamWonPred120) {
+    if ((matchingTeamWonReal120 && matchingTeamWonPred120) || bothDraw) {
       // Check exact score
       if (predMatchingScore === realMatchingScore && predOtherScore === realOtherScore) {
         return 3
