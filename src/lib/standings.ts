@@ -1,19 +1,20 @@
 /**
  * Cálculo de posiciones de un grupo según reglamento FIFA Mundial 2026.
  *
- * Orden de criterios:
- *   1. Puntos (V=3, E=1, D=0)
- *   2. Diferencia de goles (en todos los partidos del grupo)
- *   3. Goles a favor (en todos los partidos del grupo)
- *   4. Enfrentamiento directo entre los equipos empatados: puntos
- *   5. Enfrentamiento directo: DG
- *   6. Enfrentamiento directo: GF
- *   7. Sorteo — fallback determinístico por orden alfabético del nombre del equipo
- *      (no es configurable por el usuario, pero usamos orden estable para no
- *       romper invariantes; el sorteo real lo determina la FIFA)
+ * Orden de criterios (Reglamento Oficial FIFA Mundial 2026):
+ *   Para equipos empatados en puntos generales del grupo:
+ *   1. Puntos en enfrentamientos directos entre los equipos empatados
+ *   2. Diferencia de goles en enfrentamientos directos
+ *   3. Goles a favor en enfrentamientos directos
+ *   4. Diferencia de goles en todos los partidos del grupo
+ *   5. Goles a favor en todos los partidos del grupo
+ *   6. Fair Play / Conducta (omitido localmente para predicciones)
+ *   7. Clasificación Mundial FIFA (se aplica como último desempate determinístico)
+ *      (en caso de persistir empate, se usa el orden alfabético)
  */
 
 import type { Match } from './fixture'
+import { FIFA_RANKINGS } from './fixture'
 
 export interface GroupMatch {
   match: Match
@@ -101,36 +102,123 @@ function headToHeadStats(subset: string[], matches: GroupMatch[]): Map<string, T
  * Compara dos equipos por DG y GF en la mini-tabla del subset empatado.
  * Retorna negativo si a va antes que b, positivo si b va antes, 0 si siguen empatados.
  */
-function compareHeadToHead(a: TeamStats, b: TeamStats): number {
-  if (a.points !== b.points) return b.points - a.points
-  if (a.gd !== b.gd) return b.gd - a.gd
-  if (a.gf !== b.gf) return b.gf - a.gf
-  return 0
-}
-
 /**
  * Resuelve el orden dentro de un grupo (o subgrupo de empatados) aplicando los
  * criterios FIFA de forma recursiva.
+ *
+ * Pasos:
+ *   1. 'h2h': compara por puntos, DG y GF en enfrentamientos directos entre el subgrupo.
+ *      Si se logra separar a algún equipo, se vuelve a aplicar H2H recursivamente a los subgrupos.
+ *      Si ningún equipo se separa, se avanza al paso 'overall'.
+ *   2. 'overall': compara por diferencia de goles (DG) y goles a favor (GF) en todos los partidos.
+ *      Si se logra separar a algún equipo, se vuelve a aplicar H2H recursivamente a los subgrupos.
+ *      Si ningún equipo se separa, se avanza al paso 'fifa_ranking'.
+ *   3. 'fifa_ranking': ordena según la clasificación oficial de la FIFA (como fallback final).
  */
-function rankBucket(bucket: TeamStats[], allMatches: GroupMatch[]): TeamStats[] {
+function rankBucketRecursive(
+  bucket: TeamStats[],
+  allMatches: GroupMatch[],
+  step: 'h2h' | 'overall' | 'fifa_ranking'
+): TeamStats[] {
   if (bucket.length <= 1) return bucket
 
-  // Si todos los equipos del bucket están empatados en puntos/DG/GF de la tabla
-  // overall, pasamos al criterio de enfrentamiento directo (mini-tabla del bucket).
-  const h2hStats = headToHeadStats(bucket.map(s => s.team), allMatches)
+  if (step === 'fifa_ranking') {
+    return [...bucket].sort((a, b) => {
+      const rA = FIFA_RANKINGS[a.team] ?? 999
+      const rB = FIFA_RANKINGS[b.team] ?? 999
+      if (rA !== rB) return rA - rB
+      return a.team.localeCompare(b.team, 'es')
+    })
+  }
 
+  if (step === 'h2h') {
+    const h2h = headToHeadStats(bucket.map(s => s.team), allMatches)
+    const sorted = [...bucket].sort((a, b) => {
+      const statsA = h2h.get(a.team)!
+      const statsB = h2h.get(b.team)!
+      if (statsA.points !== statsB.points) return statsB.points - statsA.points
+      if (statsA.gd !== statsB.gd) return statsB.gd - statsA.gd
+      if (statsA.gf !== statsB.gf) return statsB.gf - statsA.gf
+      return 0
+    })
+
+    // Agrupar en sub-buckets de equipos que siguen empatados en puntos, GD y GF en H2H
+    const subBuckets: TeamStats[][] = []
+    let current: TeamStats[] = []
+    for (const s of sorted) {
+      if (current.length === 0) {
+        current.push(s)
+        continue
+      }
+      const prev = current[current.length - 1]
+      const prevH2H = h2h.get(prev.team)!
+      const sH2H = h2h.get(s.team)!
+      const isTied = prevH2H.points === sH2H.points &&
+                     prevH2H.gd === sH2H.gd &&
+                     prevH2H.gf === sH2H.gf
+      if (isTied) {
+        current.push(s)
+      } else {
+        subBuckets.push(current)
+        current = [s]
+      }
+    }
+    if (current.length > 0) subBuckets.push(current)
+
+    const result: TeamStats[] = []
+    for (const sub of subBuckets) {
+      if (sub.length === 1) {
+        result.push(sub[0])
+      } else if (sub.length < bucket.length) {
+        // El subgrupo se redujo, aplicamos H2H recursivo sobre los que siguen empatados
+        result.push(...rankBucketRecursive(sub, allMatches, 'h2h'))
+      } else {
+        // No se pudo separar a ningún equipo en H2H, avanzamos a estadísticas generales
+        result.push(...rankBucketRecursive(sub, allMatches, 'overall'))
+      }
+    }
+    return result
+  }
+
+  // step === 'overall'
   const sorted = [...bucket].sort((a, b) => {
-    const ah = h2hStats.get(a.team)!
-    const bh = h2hStats.get(b.team)!
-    const cmp = compareHeadToHead(ah, bh)
-    if (cmp !== 0) return cmp
-    // Fallback determinístico: orden alfabético
-    return a.team.localeCompare(b.team, 'es')
+    if (a.gd !== b.gd) return b.gd - a.gd
+    if (a.gf !== b.gf) return b.gf - a.gf
+    return 0
   })
 
-  // Si tras el head-to-head sigue habiendo empate en grupos de 2+ equipos,
-  // la lógica anterior ya aplicó alfabético — orden estable garantizado.
-  return sorted
+  // Agrupar en sub-buckets de equipos que siguen empatados en DG y GF generales
+  const subBuckets: TeamStats[][] = []
+  let current: TeamStats[] = []
+  for (const s of sorted) {
+    if (current.length === 0) {
+      current.push(s)
+      continue
+    }
+    const prev = current[current.length - 1]
+    const isTied = prev.gd === s.gd && prev.gf === s.gf
+    if (isTied) {
+      current.push(s)
+    } else {
+      subBuckets.push(current)
+      current = [s]
+    }
+  }
+  if (current.length > 0) subBuckets.push(current)
+
+  const result: TeamStats[] = []
+  for (const sub of subBuckets) {
+    if (sub.length === 1) {
+      result.push(sub[0])
+    } else if (sub.length < bucket.length) {
+      // El subgrupo se redujo, re-aplicamos H2H desde el principio para este subgrupo reducido
+      result.push(...rankBucketRecursive(sub, allMatches, 'h2h'))
+    } else {
+      // Sigue el empate total, aplicamos fallback de Ranking FIFA
+      result.push(...rankBucketRecursive(sub, allMatches, 'fifa_ranking'))
+    }
+  }
+  return result
 }
 
 /**
@@ -153,15 +241,10 @@ export function computeGroupStandings(
   const stats = computeStats(teams, matches)
   const list = [...stats.values()]
 
-  // Orden primario: puntos → DG overall → GF overall
-  list.sort((a, b) => {
-    if (a.points !== b.points) return b.points - a.points
-    if (a.gd !== b.gd) return b.gd - a.gd
-    if (a.gf !== b.gf) return b.gf - a.gf
-    return 0
-  })
+  // Orden primario: puntos únicamente
+  list.sort((a, b) => b.points - a.points)
 
-  // Agrupo equipos empatados (mismo points/gd/gf) y reordeno por head-to-head.
+  // Agrupo equipos empatados únicamente por puntos.
   const buckets: TeamStats[][] = []
   let current: TeamStats[] = []
   for (const s of list) {
@@ -170,7 +253,7 @@ export function computeGroupStandings(
       continue
     }
     const prev = current[current.length - 1]
-    if (prev.points === s.points && prev.gd === s.gd && prev.gf === s.gf) {
+    if (prev.points === s.points) {
       current.push(s)
     } else {
       buckets.push(current)
@@ -181,7 +264,7 @@ export function computeGroupStandings(
 
   const final: TeamStats[] = []
   for (const bucket of buckets) {
-    final.push(...rankBucket(bucket, matches))
+    final.push(...rankBucketRecursive(bucket, matches, 'h2h'))
   }
 
   return final.slice(0, 4).map((s, i) => ({
@@ -212,15 +295,10 @@ export function computeDetailedLiveStandings(
   const stats = computeStats(teams, validMatches)
   const list = [...stats.values()]
 
-  // Orden primario: puntos → DG overall → GF overall
-  list.sort((a, b) => {
-    if (a.points !== b.points) return b.points - a.points
-    if (a.gd !== b.gd) return b.gd - a.gd
-    if (a.gf !== b.gf) return b.gf - a.gf
-    return 0
-  })
+  // Orden primario: puntos únicamente
+  list.sort((a, b) => b.points - a.points)
 
-  // Agrupamos equipos empatados y reordenamos por head-to-head (usando solo los partidos válidos)
+  // Agrupamos equipos empatados únicamente por puntos (usando solo los partidos válidos)
   const buckets: TeamStats[][] = []
   let current: TeamStats[] = []
   for (const s of list) {
@@ -229,7 +307,7 @@ export function computeDetailedLiveStandings(
       continue
     }
     const prev = current[current.length - 1]
-    if (prev.points === s.points && prev.gd === s.gd && prev.gf === s.gf) {
+    if (prev.points === s.points) {
       current.push(s)
     } else {
       buckets.push(current)
@@ -240,7 +318,7 @@ export function computeDetailedLiveStandings(
 
   const final: TeamStats[] = []
   for (const bucket of buckets) {
-    final.push(...rankBucket(bucket, validMatches))
+    final.push(...rankBucketRecursive(bucket, validMatches, 'h2h'))
   }
 
   return final.slice(0, 4).map((s, i) => ({

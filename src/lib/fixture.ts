@@ -53,6 +53,19 @@ export const TEAM_CODES: Record<string, string> = {
   'Inglaterra': 'gb-eng', 'Croacia': 'hr', 'Ghana': 'gh', 'Panamá': 'pa',
 }
 
+export const FIFA_RANKINGS: Record<string, number> = {
+  'Francia': 1, 'España': 2, 'Argentina': 3, 'Inglaterra': 4, 'Portugal': 5,
+  'Brasil': 6, 'Países Bajos': 7, 'Marruecos': 8, 'Bélgica': 9, 'Alemania': 10,
+  'Croacia': 11, 'Colombia': 13, 'Senegal': 14, 'México': 15, 'Estados Unidos': 16,
+  'Uruguay': 17, 'Japón': 18, 'Suiza': 19, 'Irán': 21, 'Turquía': 22,
+  'Ecuador': 23, 'Austria': 24, 'Corea del Sur': 25, 'Australia': 27, 'Argelia': 28,
+  'Egipto': 29, 'Canadá': 30, 'Noruega': 31, 'Panamá': 33, 'Costa de Marfil': 34,
+  'Suecia': 38, 'Paraguay': 40, 'Rep. Checa': 41, 'Escocia': 43, 'Túnez': 44,
+  'RD Congo': 46, 'Uzbekistán': 50, 'Qatar': 55, 'Irak': 57, 'Sudáfrica': 60,
+  'Arabia Saudita': 61, 'Jordania': 63, 'Bosnia y Herzegovina': 65, 'Cabo Verde': 69,
+  'Ghana': 74, 'Curazao': 82, 'Haití': 83, 'Nueva Zelanda': 85
+}
+
 export function getFlagUrl(team: string): string {
   const code = TEAM_CODES[team]
   if (!code) return ''

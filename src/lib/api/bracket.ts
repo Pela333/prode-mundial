@@ -23,7 +23,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { GROUPS, MATCHES, BRACKET_SLOTS, type Phase } from '@/lib/fixture'
+import { GROUPS, MATCHES, BRACKET_SLOTS, FIFA_RANKINGS, type Phase } from '@/lib/fixture'
 import { computeGroupStandings, computeDetailedLiveStandings, type GroupMatch } from '@/lib/standings'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -372,7 +372,10 @@ export async function deriveBracketFromResults(supabase: SupabaseClient): Promis
     thirdStats.sort((a, b) => {
       if (b.points !== a.points) return b.points - a.points
       if (b.gd !== a.gd) return b.gd - a.gd
-      return b.gf - a.gf
+      if (b.gf !== a.gf) return b.gf - a.gf
+      const rA = FIFA_RANKINGS[a.team] ?? 999
+      const rB = FIFA_RANKINGS[b.team] ?? 999
+      return rA - rB
     })
     // Los 8 mejores terceros
     best8ThirdsByGroup = new Map(thirdStats.slice(0, 8).map(s => [s.group, s.team]))
