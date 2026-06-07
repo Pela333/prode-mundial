@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
+import { formatInArgentina } from '@/lib/dateUtils'
 import { CheckCircle2, AlertCircle, Loader2, Edit3, X, Save, ShieldAlert, Clock, Shuffle } from 'lucide-react'
 import TeamName from '@/components/TeamName'
 import type { Phase } from '@/lib/fixture'
@@ -143,7 +142,7 @@ export default function ResultsTable({ rows }: { rows: ResultRow[] }) {
               </div>
               <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
                 {r.scheduled_at && (
-                  <span>{format(new Date(r.scheduled_at), "d MMM HH:mm", { locale: es })}</span>
+                  <span>{formatInArgentina(r.scheduled_at, "d MMM HH:mm")}</span>
                 )}
                 {r.manual_override && (
                   <span className="inline-flex items-center gap-1 text-amber-400 text-[10px]">

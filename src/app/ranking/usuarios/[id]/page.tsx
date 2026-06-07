@@ -3,8 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import Navbar from '@/components/Navbar'
 import { ArrowLeft, User as UserIcon, Lock, Clock, ShieldCheck, Award } from 'lucide-react'
-import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
+import { formatInArgentina } from '@/lib/dateUtils'
 import { GROUPS, MATCHES, BRACKET_SLOTS, PHASE_LABELS, type Phase } from '@/lib/fixture'
 import PublicPredictionsViewer, { type PredItem, type ResultItem, type BracketItem } from './PublicPredictionsViewer'
 
@@ -49,7 +48,7 @@ export default async function PublicUserPredictionsPage({ params }: PageProps) {
 
   // Formatear fecha de revelación
   const revealDateStr = revealDate
-    ? format(revealDate, "d 'de' MMMM 'a las' HH:mm", { locale: es })
+    ? formatInArgentina(revealDate, "d 'de' MMMM 'a las' HH:mm")
     : null
 
   // Si no se pueden visualizar
@@ -168,7 +167,7 @@ export default async function PublicUserPredictionsPage({ params }: PageProps) {
               )}
             </h1>
             <p className="text-xs text-slate-500">
-              Participante @{target.username} · Registrado el {format(new Date(target.created_at), "d MMM yyyy", { locale: es })}
+              Participante @{target.username} · Registrado el {formatInArgentina(target.created_at, "d MMM yyyy")}
             </p>
           </div>
 

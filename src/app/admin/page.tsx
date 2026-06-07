@@ -3,8 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import Navbar from '@/components/Navbar'
 import { ShieldCheck, Calendar, Users, ChevronRight, Eye, EyeOff, Wifi, ListTodo, GitBranch } from 'lucide-react'
-import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
+import { formatInArgentina } from '@/lib/dateUtils'
 
 export const metadata = { title: 'Admin · Prode Mundial 2026' }
 export const dynamic = 'force-dynamic'
@@ -32,7 +31,7 @@ export default async function AdminPage() {
   ])
 
   const fmt = (d: string | null | undefined) =>
-    d ? format(new Date(d), "d 'de' MMM yyyy · HH:mm", { locale: es }) : 'No configurado'
+    d ? formatInArgentina(d, "d 'de' MMM yyyy · HH:mm") : 'No configurado'
 
   const now = Date.now()
   const deadlineState = (d: string | null | undefined) => {

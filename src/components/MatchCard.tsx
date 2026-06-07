@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useTransition, useEffect, useRef } from 'react'
-import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
+import { formatInArgentina } from '@/lib/dateUtils'
 import { MapPin, Clock, AlertCircle, Loader2, Lock } from 'lucide-react'
 import TeamName from './TeamName'
 import type { Match } from '@/lib/fixture'
@@ -108,8 +107,7 @@ export default function MatchCard({
     }
   }, [])
 
-  const matchDate = new Date(match.date)
-  const dateStr = format(matchDate, "d 'de' MMMM · HH:mm", { locale: es })
+  const dateStr = formatInArgentina(match.date, "d 'de' MMMM · HH:mm")
 
   const getTooltip = () => {
     if (resultPoints === null || resultPoints === undefined) return undefined

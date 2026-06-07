@@ -1,8 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition, useCallback } from 'react'
-import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
+import { formatInArgentina } from '@/lib/dateUtils'
 import { CheckCircle2, Clock, Lock, AlertCircle, Send, Loader2, Trophy } from 'lucide-react'
 import ElimMatchCard from './ElimMatchCard'
 import type { BracketSlot, Phase } from '@/lib/fixture'
@@ -455,8 +454,8 @@ function SectionHeader({
 }: {
   number: number; title: string; status: Status; deadline: string | null; submittedAt: string | null
 }) {
-  const dlStr = deadline ? format(new Date(deadline), "d 'de' MMMM HH:mm", { locale: es }) : null
-  const subStr = submittedAt ? format(new Date(submittedAt), "d 'de' MMMM HH:mm", { locale: es }) : null
+  const dlStr = deadline ? formatInArgentina(deadline, "d 'de' MMMM HH:mm") : null
+  const subStr = submittedAt ? formatInArgentina(submittedAt, "d 'de' MMMM HH:mm") : null
 
   let banner: React.ReactNode
   switch (status) {

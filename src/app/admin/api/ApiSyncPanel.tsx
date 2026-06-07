@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { format, formatDistanceToNow } from 'date-fns'
+import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { formatInArgentina } from '@/lib/dateUtils'
 import { CheckCircle2, AlertCircle, Loader2, RefreshCw, Wifi, WifiOff } from 'lucide-react'
 
 interface ApiError {
@@ -75,7 +76,7 @@ export default function ApiSyncPanel({ provider, lastSyncAt, lastSyncStatus, rec
               <p className="text-white font-semibold text-sm">Proveedor: {provider}</p>
               <p className="text-xs text-slate-500">
                 {lastSyncAt
-                  ? <>Última sync: <span className="text-slate-300">{format(new Date(lastSyncAt), "d MMM HH:mm", { locale: es })}</span> · {formatDistanceToNow(new Date(lastSyncAt), { locale: es, addSuffix: true })}</>
+                  ? <>Última sync: <span className="text-slate-300">{formatInArgentina(lastSyncAt, "d MMM HH:mm")}</span> · {formatDistanceToNow(new Date(lastSyncAt), { locale: es, addSuffix: true })}</>
                   : 'Nunca se sincronizó'}
               </p>
             </div>
@@ -147,7 +148,7 @@ export default function ApiSyncPanel({ provider, lastSyncAt, lastSyncStatus, rec
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <span className="text-slate-300 font-mono truncate">{e.endpoint}</span>
                   <span className="text-slate-500 whitespace-nowrap">
-                    {format(new Date(e.created_at), "d MMM HH:mm:ss", { locale: es })}
+                    {formatInArgentina(e.created_at, "d MMM HH:mm:ss")}
                   </span>
                 </div>
                 <p className="text-red-300/80 break-all">

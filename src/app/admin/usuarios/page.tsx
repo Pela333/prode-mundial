@@ -5,8 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import Navbar from '@/components/Navbar'
 import { ArrowLeft, Users, ShieldCheck, CheckCircle2, Circle, Phone, Eye, Mail } from 'lucide-react'
 import DeleteUserButton from './DeleteUserButton'
-import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
+import { formatInArgentina } from '@/lib/dateUtils'
 
 export const metadata = { title: 'Participantes · Admin' }
 export const dynamic = 'force-dynamic'
@@ -83,7 +82,7 @@ export default async function AdminUsersPage() {
             Participantes
           </h1>
           <p className="text-slate-400 text-sm">
-            {rows.length} {rows.length === 1 ? 'usuario registrado' : 'usuarios registrados'}.
+             {rows.length} {rows.length === 1 ? 'usuario registrado' : 'usuarios registrados'}.
           </p>
         </div>
 
@@ -129,7 +128,7 @@ export default async function AdminUsersPage() {
                     </div>
                   </div>
                   <span className="text-xs text-slate-500">
-                    {format(new Date(r.created_at), "d MMM yyyy", { locale: es })}
+                    {formatInArgentina(r.created_at, "d MMM yyyy")}
                   </span>
                   <CenterCheck on={r.sent_group} />
                   <CenterCheck on={r.sent_r32_first} />

@@ -1,8 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition, useEffect, useCallback } from 'react'
-import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
+import { formatInArgentina } from '@/lib/dateUtils'
 import { CheckCircle2, Clock, Lock, AlertCircle, Send, Loader2 } from 'lucide-react'
 import MatchCard from '@/components/MatchCard'
 import type { Group, Match } from '@/lib/fixture'
@@ -179,11 +178,11 @@ export default function GroupStageBoard({
 
   // Submitted: mostrar timestamp formateado
   const submittedAtStr = submittedAt
-    ? format(new Date(submittedAt), "d 'de' MMMM 'a las' HH:mm", { locale: es })
+    ? formatInArgentina(submittedAt, "d 'de' MMMM 'a las' HH:mm")
     : null
 
   const deadlineStr = deadlineDate
-    ? format(deadlineDate, "d 'de' MMMM 'a las' HH:mm", { locale: es })
+    ? formatInArgentina(deadlineDate, "d 'de' MMMM 'a las' HH:mm")
     : null
 
   return (

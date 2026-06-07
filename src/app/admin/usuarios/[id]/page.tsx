@@ -4,8 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import Navbar from '@/components/Navbar'
 import { ArrowLeft, User as UserIcon, Phone, Mail, ShieldCheck } from 'lucide-react'
-import { format } from 'date-fns'
-import { es } from 'date-fns/locale'
+import { formatInArgentina } from '@/lib/dateUtils'
 import { GROUPS, MATCHES, BRACKET_SLOTS, PHASE_LABELS, type Phase } from '@/lib/fixture'
 import UserPredictionsEditor, { type PredItem, type ResultItem, type BracketItem } from './UserPredictionsEditor'
 
@@ -118,7 +117,7 @@ export default async function AdminUserPredictionsPage({ params }: PageProps) {
             <span>@{target.username}</span>
             {email && <span className="flex items-center gap-1"><Mail size={11} /> {email}</span>}
             <span className="flex items-center gap-1"><Phone size={11} /> {target.phone}</span>
-            <span>Registrado el {format(new Date(target.created_at), "d MMM yyyy", { locale: es })}</span>
+            <span>Registrado el {formatInArgentina(target.created_at, "d MMM yyyy")}</span>
           </div>
         </div>
 
@@ -131,7 +130,7 @@ export default async function AdminUserPredictionsPage({ params }: PageProps) {
               <div key={phase} className="rounded-xl bg-[#111827] border border-white/8 p-3 text-center">
                 <div className="text-xs text-slate-500 uppercase font-semibold">{labels[phase]}</div>
                 {sub
-                  ? <div className="text-green-400 text-xs mt-1">Enviado · {format(new Date(sub.submitted_at), "d MMM HH:mm", { locale: es })}</div>
+                  ? <div className="text-green-400 text-xs mt-1">Enviado · {formatInArgentina(sub.submitted_at, "d MMM HH:mm")}</div>
                   : <div className="text-slate-600 text-xs mt-1">No enviado</div>}
               </div>
             )
