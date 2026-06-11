@@ -5,7 +5,7 @@ import { formatInArgentina } from '@/lib/dateUtils'
 import { CheckCircle2, AlertCircle, Loader2, Edit3, X, Save, ShieldAlert, Clock, Shuffle } from 'lucide-react'
 import TeamName from '@/components/TeamName'
 import type { Phase } from '@/lib/fixture'
-import { correctResultAction, generateRandomResultsAction } from './actions'
+import { correctResultAction, generateRandomResultsAction, revertToApiAction } from './actions'
 
 export interface ResultRow {
   match_id: string
@@ -228,6 +228,29 @@ function EditModal({ row, onClose }: { row: ResultRow; onClose: () => void }) {
   const [success, setSuccess] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
+  function handleRevert() {
+    const confirm = window.confirm(
+      "¿Estás seguro de que querés restablecer este partido a la API?\n\nEsto quitará la corrección manual y se sincronizará el resultado real más reciente de Football-Data.org."
+    )
+    if (!confirm) return
+
+    setError(null)
+    setSuccess(null)
+
+    startTransition(async () => {
+      const res = await revertToApiAction(row.match_id)
+      if (res.error) {
+        setError(res.error)
+        return
+      }
+      setSuccess("Partido restablecido a la API")
+      setTimeout(() => {
+        onClose()
+        window.location.reload()
+      }, 1500)
+    })
+  }
+
   function parseScore(v: string): number | null {
     if (v === '') return null
     const n = parseInt(v, 10)
@@ -359,7 +382,17 @@ function EditModal({ row, onClose }: { row: ResultRow; onClose: () => void }) {
             </div>
           )}
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex items-center justify-end gap-2 pt-2">
+            {row.manual_override && (
+              <button
+                type="button"
+                onClick={handleRevert}
+                disabled={isPending}
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-amber-500 hover:text-amber-400 hover:bg-amber-500/10 disabled:opacity-40 mr-auto border border-amber-500/20"
+              >
+                Restablecer a la API
+              </button>
+            )}
             <button
               type="button" onClick={onClose} disabled={isPending}
               className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-300 hover:text-white hover:bg-white/5 disabled:opacity-40"

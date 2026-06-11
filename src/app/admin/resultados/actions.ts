@@ -122,6 +122,78 @@ export async function correctResultAction(input: CorrectResultInput): Promise<Ac
   return { ok: true, recalculated }
 }
 
+export async function revertToApiAction(matchId: string): Promise<ActionResult> {
+  const { user, isAdmin } = await assertAdmin()
+  if (!isAdmin || !user) return { error: 'No autorizado' }
+
+  const admin = createAdminClient()
+
+  // 1. Obtener estado previo para audit_log
+  const { data: previous } = await admin
+    .from('results')
+    .select('*')
+    .eq('match_id', matchId)
+    .maybeSingle()
+
+  if (!previous) return { error: 'Ese partido no existe en la base de datos' }
+
+  // 2. Quitar manual_override y dejar que la API lo maneje
+  const { error } = await admin
+    .from('results')
+    .update({
+      manual_override: false,
+      corrected_by: null,
+      corrected_at: null,
+    })
+    .eq('match_id', matchId)
+
+  if (error) return { error: 'No se pudo restablecer el partido: ' + error.message }
+
+  // 3. Registrar en audit_log
+  await admin.from('audit_log').insert({
+    actor_id: user.id,
+    action: 'result_corrected',
+    target_type: 'result',
+    target_id: matchId,
+    meta: {
+      reason: 'Restablecido para sincronizar desde la API de Football-Data.org',
+      previous: {
+        home_score: previous.home_score,
+        away_score: previous.away_score,
+        home_score_120: previous.home_score_120,
+        away_score_120: previous.away_score_120,
+        went_to_pens: previous.went_to_pens,
+        pen_winner: previous.pen_winner,
+        status: previous.status,
+        manual_override: previous.manual_override,
+      },
+      new: {
+        manual_override: false,
+      },
+    },
+  })
+
+  // 4. Disparar sync con la API para que actualice este partido de inmediato si tiene datos
+  try {
+    const { syncFromApi } = await import('@/lib/api/sync')
+    await syncFromApi(admin)
+  } catch (err) {
+    console.error('Error al sincronizar después de revertir a la API:', err)
+  }
+
+  // 5. Revalidar todas las páginas afectadas
+  revalidatePath('/prode')
+  revalidatePath('/prode/eliminatoria')
+  revalidatePath('/ranking')
+  revalidatePath('/ranking/usuarios/[id]', 'page')
+  revalidatePath('/admin/resultados')
+  revalidatePath('/admin/bracket')
+  revalidatePath('/admin/usuarios/[id]', 'page')
+
+  return { ok: true }
+}
+
+
 export async function generateRandomResultsAction(): Promise<ActionResult> {
   const { user, isAdmin } = await assertAdmin()
   if (!isAdmin || !user) return { error: 'No autorizado' }

@@ -212,6 +212,11 @@ export default function MatchCard({
               Real: {realHomeScore} : {realAwayScore}
             </span>
           )}
+          {realStatus === 'in_progress' && realHomeScore != null && realAwayScore != null && (
+            <span className="text-[11px] text-amber-400 font-bold bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-md mt-0.5 select-none whitespace-nowrap animate-pulse">
+              En vivo: {realHomeScore} : {realAwayScore}
+            </span>
+          )}
         </div>
 
         <div className="flex-1 min-w-0 flex justify-end">

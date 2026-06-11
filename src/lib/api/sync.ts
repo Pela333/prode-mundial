@@ -77,8 +77,21 @@ function apiMatchToResult(m: ApiMatch, matchId: string, phase: Phase, overridden
   const home_full = m.score.fullTime?.home ?? null
   const away_full = m.score.fullTime?.away ?? null
 
-  const isOverridden = overriddenMap.has(matchId)
+  let isOverridden = overriddenMap.has(matchId)
   const o = overriddenMap.get(matchId)
+
+  // Safety guard: si el override tiene estado 'scheduled' y no tiene goles, lo ignoramos y dejamos que la API lo actualice
+  if (isOverridden && o) {
+    const isPlaceholder =
+      o.status === 'scheduled' &&
+      o.home_score === null &&
+      o.away_score === null &&
+      o.home_score_120 === null &&
+      o.away_score_120 === null
+    if (isPlaceholder) {
+      isOverridden = false
+    }
+  }
 
   let home_score: number | null = null
   let away_score: number | null = null

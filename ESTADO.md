@@ -126,7 +126,7 @@ Documento de seguimiento honesto: qué está hecho, qué falta y dónde la imple
 
 | # | Spec dice | Implementación actual | Riesgo |
 |---|---|---|---|
-| A | "**Bonus posicionamiento**: +1 punto si el equipo que ganó el partido real fue clasificado por el usuario **en esa misma posición de grupo** en Fase 1" ([módulo 6](Especificacion_Prode_Mundial_2026.docx)) | En [recalc.ts:128-138](src/lib/api/recalc.ts#L128-L138) sumo +1 si el ganador real está **en cualquier posición** que el usuario predijo en su grupo. **No verifico que coincida con la posición real** del equipo en `group_standings`. | **Sí es bug**. La interpretación correcta sería: si el ganador real terminó como "2° de B" en `group_standings`, otorgo +1 solo si el usuario también predijo a ese equipo como "2° de B" en sus standings de Fase 1. **Hay que arreglarlo antes que se jueguen partidos eliminatorios.** |
+| A | "**Bonus posicionamiento**: +1 punto si el equipo que ganó el partido real fue clasificado por el usuario **en esa misma posición de grupo** en Fase 1" ([módulo 6](Especificacion_Prode_Mundial_2026.docx)) | Solucionado en commit `226ce6d`. Compara la posición pronosticada por el usuario contra la posición real en `group_standings` y requiere que haya acertado el ganador. | OK |
 | B | "Por cada equipo ubicado en posición exacta de su grupo (posición calculada vs. **clasificación real de la API**): +2 puntos" ([módulo 6](Especificacion_Prode_Mundial_2026.docx)) | [recalc.ts:160-204](src/lib/api/recalc.ts#L160-L204) compara contra `group_standings`, que se llena desde el endpoint `/standings` de la API. El advisor verifica que sea correcto: ✓ | OK |
 | C | "Posibilidad de modificar cualquiera de estas fechas **antes de que lleguen**" ([módulo 8.1](Especificacion_Prode_Mundial_2026.docx)) | `/admin/config` permite modificar también deadlines pasadas | Bajo. Si el admin se equivoca puede "reabrir" una fase ya cerrada. Validación trivial de agregar. |
 | D | "Una vez enviado: todos los campos quedan en modo lectura, **no editables bajo ninguna circunstancia**" ([módulo 4](Especificacion_Prode_Mundial_2026.docx)) | El **admin** sí puede editar pronósticos enviados (en `/admin/usuarios/[id]`) | **Hay tensión** con la spec — pero la spec también dice (módulo 8.2) "El admin puede modificar los resultados cargados por cualquier usuario en cualquier momento". Las dos cláusulas se contradicen entre sí. Tomamos la de admin que es más explícita. |
@@ -146,7 +146,7 @@ Documento de seguimiento honesto: qué está hecho, qué falta y dónde la imple
 ## 🔧 Pasos siguientes recomendados (en orden)
 
 1. **Cargar `SUPABASE_SERVICE_ROLE_KEY`** en `.env.local` y reiniciar dev. Sin esto el sync no anda.
-2. **Arreglar el bug del bonus posicionamiento** (discrepancia A): cambiar la lógica para comparar contra `group_standings` real, no contra "cualquier posición pronosticada".
+2. ~~**Arreglar el bug del bonus posicionamiento** (discrepancia A)~~ (Solucionado).
 3. **Probar el sync manual** desde `/admin/api` con la API real, ver si el bracket se llena bien y las deadlines se autoconfiguran.
 4. **Construir la página pública de pronósticos ajenos** (pendiente 4) y el drill-down de ranking (pendiente 5).
 5. **Implementar el bonus de podio** al finalizar el torneo (pendiente 1).
