@@ -217,6 +217,7 @@ export interface MatchPredictionsResult {
 }
 
 export async function getMatchPredictionsAction(matchId: string): Promise<MatchPredictionsResult> {
+  const isElim = !/^[A-L]\d+$/.test(matchId)
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { locked: true, revealDate: null, error: 'No autenticado' }
@@ -319,7 +320,48 @@ export async function getMatchPredictionsAction(matchId: string): Promise<MatchP
   })
 
   list.sort((a, b) => {
-    if (b.points !== a.points) return b.points - a.points
+    const hA = isElim ? a.homeScore120 : a.homeScore
+    const aA = isElim ? a.awayScore120 : a.awayScore
+    const hB = isElim ? b.homeScore120 : b.homeScore
+    const aB = isElim ? b.awayScore120 : b.awayScore
+
+    // 1. Clasificar en categoría: 1 = Gana Local, 2 = Empate, 3 = Gana Visitante, 4 = Vacío
+    const getCat = (h: number | null, av: number | null) => {
+      if (h === null || av === null) return 4
+      if (h > av) return 1
+      if (h === av) return 2
+      return 3
+    }
+
+    const catA = getCat(hA, aA)
+    const catB = getCat(hB, aB)
+
+    if (catA !== catB) {
+      return catA - catB
+    }
+
+    // 2. Si son de la misma categoría, ordenar por marcador exacto
+    if (catA === 1) {
+      // Local gana: ordenar por local desc, visitante asc
+      if (hA !== hB) return hB! - hA!
+      if (aA !== aB) return aA! - aB!
+    } else if (catA === 2) {
+      // Empate: ordenar por goles desc (ej: 2-2 antes de 1-1)
+      if (hA !== hB) return hB! - hA!
+    } else if (catA === 3) {
+      // Visitante gana: ordenar por visitante desc, local asc
+      if (aA !== aB) return aB! - aA!
+      if (hA !== hB) return hA! - hB!
+    }
+
+    // 3. Si tienen el mismo marcador, ordenar por penWinner en eliminatorias
+    if (isElim && a.penWinner !== b.penWinner) {
+      const penA = a.penWinner ?? ''
+      const penB = b.penWinner ?? ''
+      return penA.localeCompare(penB, 'es')
+    }
+
+    // 4. Si siguen empatados, ordenar por nombre alfabéticamente
     return a.name.localeCompare(b.name, 'es')
   })
 
