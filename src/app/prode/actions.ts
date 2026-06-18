@@ -197,3 +197,129 @@ export async function confirmGroupSubmission(): Promise<ConfirmGroupResult> {
   revalidatePath('/prode')
   return { ok: true, standings, submittedAt: new Date().toISOString() }
 }
+
+export interface MatchPrediction {
+  name: string
+  username: string
+  homeScore: number | null
+  awayScore: number | null
+  homeScore120: number | null
+  awayScore120: number | null
+  penWinner: string | null
+  points: number
+}
+
+export interface MatchPredictionsResult {
+  locked: boolean
+  revealDate: string | null
+  predictions?: MatchPrediction[]
+  error?: string
+}
+
+export async function getMatchPredictionsAction(matchId: string): Promise<MatchPredictionsResult> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { locked: true, revealDate: null, error: 'No autenticado' }
+
+  // 1. Obtener app config para reveal_predictions_at
+  const { data: config, error: configErr } = await supabase
+    .from('app_config_public')
+    .select('reveal_predictions_at')
+    .single()
+
+  if (configErr) {
+    return { locked: true, revealDate: null, error: 'Error al consultar la configuración' }
+  }
+
+  // 2. Verificar rol del usuario
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  const isAdmin = profile?.role === 'admin'
+  const revealDate = config?.reveal_predictions_at ? new Date(config.reveal_predictions_at) : null
+  const isRevealed = revealDate && revealDate.getTime() <= Date.now()
+
+  // 3. Si no está revelado y no es admin, solo devolvemos su propia predicción
+  if (!isAdmin && !isRevealed) {
+    const { data: ownPred } = await supabase
+      .from('predictions')
+      .select('home_score, away_score, home_score_120, away_score_120, pen_winner, result_points, bonus_points')
+      .eq('user_id', user.id)
+      .eq('match_id', matchId)
+      .maybeSingle()
+
+    const ownList: MatchPrediction[] = []
+    if (ownPred) {
+      const { data: ownProfile } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, username')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      ownList.push({
+        name: ownProfile ? `${ownProfile.first_name} ${ownProfile.last_name}` : 'Vos',
+        username: ownProfile?.username ?? '',
+        homeScore: ownPred.home_score,
+        awayScore: ownPred.away_score,
+        homeScore120: ownPred.home_score_120,
+        awayScore120: ownPred.away_score_120,
+        penWinner: ownPred.pen_winner,
+        points: (ownPred.result_points ?? 0) + (ownPred.bonus_points ?? 0),
+      })
+    }
+
+    return {
+      locked: true,
+      revealDate: config?.reveal_predictions_at ?? null,
+      predictions: ownList,
+    }
+  }
+
+  // 4. Si está revelado o es admin, traemos todas
+  const { data: allPreds, error: predsErr } = await supabase
+    .from('predictions')
+    .select(`
+      home_score,
+      away_score,
+      home_score_120,
+      away_score_120,
+      pen_winner,
+      result_points,
+      bonus_points,
+      profiles (
+        first_name,
+        last_name,
+        username
+      )
+    `)
+    .eq('match_id', matchId)
+
+  if (predsErr) {
+    return { locked: false, revealDate: config?.reveal_predictions_at ?? null, error: 'Error al consultar predicciones' }
+  }
+
+  const list: MatchPrediction[] = (allPreds ?? []).map((p: any) => ({
+    name: p.profiles ? `${p.profiles.first_name} ${p.profiles.last_name}` : 'Participante',
+    username: p.profiles?.username ?? '',
+    homeScore: p.home_score,
+    awayScore: p.away_score,
+    homeScore120: p.home_score_120,
+    awayScore120: p.away_score_120,
+    penWinner: p.pen_winner,
+    points: (p.result_points ?? 0) + (p.bonus_points ?? 0),
+  }))
+
+  list.sort((a, b) => {
+    if (b.points !== a.points) return b.points - a.points
+    return a.name.localeCompare(b.name, 'es')
+  })
+
+  return {
+    locked: false,
+    revealDate: config?.reveal_predictions_at ?? null,
+    predictions: list,
+  }
+}

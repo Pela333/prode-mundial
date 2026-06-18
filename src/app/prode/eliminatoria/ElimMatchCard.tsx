@@ -2,9 +2,10 @@
 
 import { useState, useTransition, useEffect, useRef, useCallback } from 'react'
 import { formatInArgentina } from '@/lib/dateUtils'
-import { AlertCircle, Loader2, Lock, Trophy } from 'lucide-react'
+import { AlertCircle, Loader2, Lock, Trophy, Eye } from 'lucide-react'
 import TeamName from '@/components/TeamName'
 import { saveElimDraft } from './actions'
+import MatchPredictionsModal from '@/components/MatchPredictionsModal'
 
 export interface ElimMatchCardProps {
   matchId: string
@@ -39,6 +40,7 @@ export default function ElimMatchCard(props: ElimMatchCardProps) {
   const [home, setHome] = useState<string>(props.initialHome120 != null ? String(props.initialHome120) : '')
   const [away, setAway] = useState<string>(props.initialAway120 != null ? String(props.initialAway120) : '')
   const [penWinner, setPenWinner] = useState<string | null>(props.initialPenWinner)
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [savedMark, setSavedMark] = useState(false)
@@ -192,6 +194,14 @@ export default function ElimMatchCard(props: ElimMatchCardProps) {
           <span className="text-slate-500">{dateStr}</span>
         </div>
         <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            title="Ver pronósticos de participantes"
+            className="p-1 rounded text-slate-500 hover:text-amber-400 hover:bg-white/5 transition-colors shrink-0"
+          >
+            <Eye size={12} />
+          </button>
           {pointsBadge()}
           {props.locked && props.lockedReason && (
             <span title={props.lockedReason}><Lock size={11} className="text-slate-600" /></span>
@@ -334,6 +344,15 @@ export default function ElimMatchCard(props: ElimMatchCardProps) {
           </div>
         )}
       </div>
+      {isModalOpen && (
+        <MatchPredictionsModal
+          matchId={props.matchId}
+          homeTeam={props.homeTeam}
+          awayTeam={props.awayTeam}
+          isElim={true}
+          onClose={() => setIsModalOpen(false)}
+        />
+      )}
     </div>
   )
 }

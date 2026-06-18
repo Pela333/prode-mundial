@@ -2,10 +2,11 @@
 
 import { useState, useTransition, useEffect, useRef } from 'react'
 import { formatInArgentina } from '@/lib/dateUtils'
-import { MapPin, Clock, AlertCircle, Loader2, Lock } from 'lucide-react'
+import { MapPin, Clock, AlertCircle, Loader2, Lock, Eye } from 'lucide-react'
 import TeamName from './TeamName'
 import type { Match } from '@/lib/fixture'
 import { saveGroupDraft } from '@/app/prode/actions'
+import MatchPredictionsModal from './MatchPredictionsModal'
 
 interface MatchCardProps {
   match: Match
@@ -44,6 +45,7 @@ export default function MatchCard({
 }: MatchCardProps) {
   const [home, setHome] = useState<string>(initialHome != null ? String(initialHome) : '')
   const [away, setAway] = useState<string>(initialAway != null ? String(initialAway) : '')
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [savedMark, setSavedMark] = useState(false)
@@ -162,6 +164,14 @@ export default function MatchCard({
           </span>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            title="Ver pronósticos de participantes"
+            className="p-1 rounded text-slate-500 hover:text-amber-400 hover:bg-white/5 transition-colors shrink-0"
+          >
+            <Eye size={12} />
+          </button>
           {pointsBadge()}
           {locked && lockedReason && (
             <span className="text-xs text-slate-600 font-medium flex items-center gap-1" title={lockedReason}>
@@ -240,6 +250,15 @@ export default function MatchCard({
             <span className="text-green-500/80">Guardado</span>
           )}
         </div>
+      )}
+      {isModalOpen && (
+        <MatchPredictionsModal
+          matchId={match.id}
+          homeTeam={match.home}
+          awayTeam={match.away}
+          isElim={false}
+          onClose={() => setIsModalOpen(false)}
+        />
       )}
     </div>
   )

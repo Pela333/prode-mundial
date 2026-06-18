@@ -195,7 +195,7 @@ export default function UserPredictionsEditor(props: Props) {
               <div className="rounded-xl bg-[#111827] border border-white/8 divide-y divide-white/5">
                 {props.groupMatches
                   .filter(m => m.group === g.id)
-                  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                  .sort((a, b) => a.date.localeCompare(b.date))
                   .map(m => {
                   const pred = predByMatch.get(m.id)
                   const real = resultByMatch.get(m.id)

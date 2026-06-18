@@ -245,7 +245,7 @@ export default function GroupStageBoard({
       {groups.map(group => {
         const gMatches = matches
           .filter(m => m.group === group.id)
-          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+          .sort((a, b) => a.date.localeCompare(b.date))
         const groupComplete = gMatches.every(m => {
           const s = scores[m.id]
           return s && s.home !== null && s.away !== null

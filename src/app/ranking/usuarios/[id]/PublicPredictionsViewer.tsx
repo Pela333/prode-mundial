@@ -178,7 +178,7 @@ export default function PublicPredictionsViewer(props: Props) {
       let complete = true
       const groupMatches = props.groupMatches
         .filter(m => m.group === g.id)
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .sort((a, b) => a.date.localeCompare(b.date))
       for (const m of groupMatches) {
         const p = predMap.get(m.id)
         if (!p || p.home === null || p.away === null) {
@@ -267,7 +267,7 @@ export default function PublicPredictionsViewer(props: Props) {
               <div className="rounded-xl bg-[#111827] border border-white/8 divide-y divide-white/5 overflow-hidden">
                 {props.groupMatches
                   .filter(m => m.group === g.id)
-                  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                  .sort((a, b) => a.date.localeCompare(b.date))
                   .map(m => {
                   const pred = predByMatch.get(m.id)
                   const real = resultByMatch.get(m.id)
