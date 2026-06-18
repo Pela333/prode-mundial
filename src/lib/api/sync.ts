@@ -65,7 +65,13 @@ function buildBracketIndex(): Map<string, { id: string; phase: Phase; position: 
 /**
  * Convierte un partido de la API en un payload normalizado para upsertear en `results`.
  */
-function apiMatchToResult(m: ApiMatch, matchId: string, phase: Phase, overriddenMap: Map<string, any>) {
+function apiMatchToResult(
+  m: ApiMatch,
+  matchId: string,
+  phase: Phase,
+  overriddenMap: Map<string, any>,
+  isInverted = false
+) {
   const finished = m.status === 'FINISHED'
   const went_to_pens = finished && m.score.duration === 'PENALTY_SHOOTOUT'
 
@@ -74,8 +80,9 @@ function apiMatchToResult(m: ApiMatch, matchId: string, phase: Phase, overridden
   // Para 90' real, deberíamos usar score.regularTime, pero la API v4 no lo expone consistentemente.
   // Convención: score.fullTime cuando duration === 'REGULAR' es 90'; cuando es 'EXTRA_TIME' o 'PENALTY_SHOOTOUT'
   // entonces score.fullTime es el resultado a 120' (incluyendo prórroga). El score a 90' no se publica.
-  const home_full = m.score.fullTime?.home ?? null
-  const away_full = m.score.fullTime?.away ?? null
+  // Si los equipos están invertidos respecto a nuestro fixture local, intercambiamos los goles.
+  const home_full = isInverted ? (m.score.fullTime?.away ?? null) : (m.score.fullTime?.home ?? null)
+  const away_full = isInverted ? (m.score.fullTime?.home ?? null) : (m.score.fullTime?.away ?? null)
 
   let isOverridden = overriddenMap.has(matchId)
   const o = overriddenMap.get(matchId)
@@ -251,8 +258,9 @@ export async function syncFromApi(supabase: SupabaseClient): Promise<SyncReport>
       report.errors.push(`No se encontró match en fixture para ${groupLetter} ${homeName} vs ${awayName}`)
       continue
     }
+    const isInverted = fixtureMatch.home !== homeName
     matchIdMap.set(m.id, fixtureMatch.id)
-    groupResults.push(apiMatchToResult(m, fixtureMatch.id, 'group', overriddenMap))
+    groupResults.push(apiMatchToResult(m, fixtureMatch.id, 'group', overriddenMap, isInverted))
   }
 
   if (groupResults.length > 0) {

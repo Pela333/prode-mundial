@@ -176,7 +176,9 @@ export default function PublicPredictionsViewer(props: Props) {
     for (const g of props.groups) {
       const gMatchesPred: any[] = []
       let complete = true
-      const groupMatches = props.groupMatches.filter(m => m.group === g.id)
+      const groupMatches = props.groupMatches
+        .filter(m => m.group === g.id)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
       for (const m of groupMatches) {
         const p = predMap.get(m.id)
         if (!p || p.home === null || p.away === null) {
@@ -263,7 +265,10 @@ export default function PublicPredictionsViewer(props: Props) {
             <section key={g.id} className="animate-fade-in-up">
               <h3 className="text-slate-400 font-bold text-sm mb-2 px-1">{g.name}</h3>
               <div className="rounded-xl bg-[#111827] border border-white/8 divide-y divide-white/5 overflow-hidden">
-                {props.groupMatches.filter(m => m.group === g.id).map(m => {
+                {props.groupMatches
+                  .filter(m => m.group === g.id)
+                  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                  .map(m => {
                   const pred = predByMatch.get(m.id)
                   const real = resultByMatch.get(m.id)
                   return (

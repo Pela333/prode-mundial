@@ -193,7 +193,10 @@ export default function UserPredictionsEditor(props: Props) {
             <section key={g.id}>
               <h3 className="text-slate-400 font-semibold text-sm mb-2">{g.name}</h3>
               <div className="rounded-xl bg-[#111827] border border-white/8 divide-y divide-white/5">
-                {props.groupMatches.filter(m => m.group === g.id).map(m => {
+                {props.groupMatches
+                  .filter(m => m.group === g.id)
+                  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                  .map(m => {
                   const pred = predByMatch.get(m.id)
                   const real = resultByMatch.get(m.id)
                   return (
