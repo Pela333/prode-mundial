@@ -281,36 +281,42 @@ export async function getMatchPredictionsAction(matchId: string): Promise<MatchP
   // 4. Si está revelado o es admin, traemos todas
   const { data: allPreds, error: predsErr } = await supabase
     .from('predictions')
-    .select(`
-      home_score,
-      away_score,
-      home_score_120,
-      away_score_120,
-      pen_winner,
-      result_points,
-      bonus_points,
-      profiles (
-        first_name,
-        last_name,
-        username
-      )
-    `)
+    .select('user_id, home_score, away_score, home_score_120, away_score_120, pen_winner, result_points, bonus_points')
     .eq('match_id', matchId)
 
   if (predsErr) {
     return { locked: false, revealDate: config?.reveal_predictions_at ?? null, error: 'Error al consultar predicciones' }
   }
 
-  const list: MatchPrediction[] = (allPreds ?? []).map((p: any) => ({
-    name: p.profiles ? `${p.profiles.first_name} ${p.profiles.last_name}` : 'Participante',
-    username: p.profiles?.username ?? '',
-    homeScore: p.home_score,
-    awayScore: p.away_score,
-    homeScore120: p.home_score_120,
-    awayScore120: p.away_score_120,
-    penWinner: p.pen_winner,
-    points: (p.result_points ?? 0) + (p.bonus_points ?? 0),
-  }))
+  const userIds = (allPreds ?? []).map(p => p.user_id)
+  let profilesMap = new Map<string, any>()
+
+  if (userIds.length > 0) {
+    const { data: allProfs, error: profsErr } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name, username')
+      .in('id', userIds)
+
+    if (profsErr) {
+      return { locked: false, revealDate: config?.reveal_predictions_at ?? null, error: 'Error al consultar perfiles' }
+    }
+
+    profilesMap = new Map(allProfs?.map(p => [p.id, p]) ?? [])
+  }
+
+  const list: MatchPrediction[] = (allPreds ?? []).map((p: any) => {
+    const profile = profilesMap.get(p.user_id)
+    return {
+      name: profile ? `${profile.first_name} ${profile.last_name}` : 'Participante',
+      username: profile?.username ?? '',
+      homeScore: p.home_score,
+      awayScore: p.away_score,
+      homeScore120: p.home_score_120,
+      awayScore120: p.away_score_120,
+      penWinner: p.pen_winner,
+      points: (p.result_points ?? 0) + (p.bonus_points ?? 0),
+    }
+  })
 
   list.sort((a, b) => {
     if (b.points !== a.points) return b.points - a.points
