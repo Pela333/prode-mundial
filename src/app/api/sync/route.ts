@@ -39,7 +39,7 @@ export async function POST() {
   }
 
   try {
-    const report = await syncFromApi(admin)
+    const report = await syncFromApi(admin, { bypassCache: true })
     return NextResponse.json(report)
   } catch (err) {
     return NextResponse.json(

@@ -30,11 +30,35 @@ export interface SyncReport {
   startedAt: string
   finishedAt: string
   ok: boolean
+  fromCache: boolean
   groupMatchesUpdated: number
   bracketSlotsUpdated: number
   groupStandingsUpdated: number
   recalculatedPredictions: number
   errors: string[]
+}
+
+/** TTL del caché en segundos (4 minutos). */
+const CACHE_TTL_SECONDS = 4 * 60
+
+/** Lee el último SyncReport cacheado. Devuelve null si no existe o expiró. */
+async function readSyncCache(supabase: SupabaseClient): Promise<SyncReport | null> {
+  const { data, error } = await supabase
+    .from('sync_cache')
+    .select('cached_at, payload')
+    .eq('id', 1)
+    .maybeSingle()
+  if (error || !data) return null
+  const ageSeconds = (Date.now() - new Date(data.cached_at).getTime()) / 1000
+  if (ageSeconds > CACHE_TTL_SECONDS) return null
+  return data.payload as SyncReport
+}
+
+/** Persiste el SyncReport en la tabla singleton sync_cache. */
+async function writeSyncCache(supabase: SupabaseClient, report: SyncReport): Promise<void> {
+  await supabase
+    .from('sync_cache')
+    .upsert({ id: 1, cached_at: new Date().toISOString(), payload: report }, { onConflict: 'id' })
 }
 
 const STAGE_API_TO_PHASE = API_STAGE_TO_PHASE
@@ -166,11 +190,24 @@ function apiMatchToResult(
  *
  * Recibe un SupabaseClient (admin con service_role) para bypassear RLS.
  */
-export async function syncFromApi(supabase: SupabaseClient): Promise<SyncReport> {
+export async function syncFromApi(
+  supabase: SupabaseClient,
+  /** Si es true, omite el caché y siempre ejecuta el sync completo. */
+  { bypassCache = false }: { bypassCache?: boolean } = {},
+): Promise<SyncReport> {
+  // ── Caché: si el último sync es reciente, devolver sin llamar a la API ──
+  if (!bypassCache) {
+    const cached = await readSyncCache(supabase)
+    if (cached) {
+      return { ...cached, fromCache: true }
+    }
+  }
+
   const report: SyncReport = {
     startedAt: new Date().toISOString(),
     finishedAt: '',
     ok: false,
+    fromCache: false,
     groupMatchesUpdated: 0,
     bracketSlotsUpdated: 0,
     groupStandingsUpdated: 0,
@@ -377,6 +414,10 @@ export async function syncFromApi(supabase: SupabaseClient): Promise<SyncReport>
   await markSync(supabase, report.errors.length === 0 ? 'ok' : 'error')
   report.ok = report.errors.length === 0
   report.finishedAt = new Date().toISOString()
+
+  // ── Actualizar caché con el resultado fresco ──
+  await writeSyncCache(supabase, report)
+
   return report
 }
 

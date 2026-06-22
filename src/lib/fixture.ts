@@ -213,3 +213,91 @@ export const SCORING = {
   positionBonusElim: 1,
   podium: { champion: 15, runnerUp: 8, third: 5, fourth: 3 },
 }
+
+// ─── Helpers de programación del torneo ───────────────────────────────────────
+
+/**
+ * Minutos máximos que puede durar un partido incluyendo prórroga y penales
+ * con un margen adicional de seguridad.
+ */
+const MAX_MATCH_DURATION_MINUTES = 210 // 90 + ET + penales + margen
+
+/**
+ * Minutos de adelanto con que se abre la ventana de actividad antes del kickoff.
+ */
+const WINDOW_BEFORE_KICKOFF_MINUTES = 30
+
+/**
+ * Inicio estimado de la fase eliminatoria (R32 en adelante).
+ * Como las fechas exactas vienen de la API y no del fixture estático,
+ * cubrimos todo el período con una ventana continua.
+ */
+const ELIMINATION_PHASE_START = new Date('2026-07-01T00:00:00Z')
+const ELIMINATION_PHASE_END   = new Date('2026-07-20T00:00:00Z')
+
+/**
+ * Devuelve `true` si `now` cae dentro de alguna ventana de actividad del
+ * Mundial 2026. Para la fase de grupos se computa partido a partido:
+ *   ventana = [kickoff - WINDOW_BEFORE_KICKOFF_MINUTES, kickoff + MAX_MATCH_DURATION_MINUTES]
+ * Para la fase eliminatoria se usa un rango continuo (julio 1–19) porque
+ * las fechas exactas solo se conocen desde la API en tiempo de ejecución.
+ *
+ * Esta función es pura (sin I/O) y se ejecuta en < 1ms.
+ */
+export function isWorldCupActiveWindow(now: Date): boolean {
+  const nowMs = now.getTime()
+
+  // Fase eliminatoria: ventana continua
+  if (nowMs >= ELIMINATION_PHASE_START.getTime() && nowMs <= ELIMINATION_PHASE_END.getTime()) {
+    return true
+  }
+
+  // Fase de grupos: ventana por partido
+  for (const match of MATCHES) {
+    if (match.phase !== 'group') continue
+    const kickoff = new Date(match.date).getTime()
+    const windowStart = kickoff - WINDOW_BEFORE_KICKOFF_MINUTES * 60_000
+    const windowEnd   = kickoff + MAX_MATCH_DURATION_MINUTES * 60_000
+    if (nowMs >= windowStart && nowMs <= windowEnd) {
+      return true
+    }
+  }
+
+  return false
+}
+
+/**
+ * Devuelve `true` si existe algún partido de la fase de grupos que:
+ *   - Ya empezó y no han pasado más de MAX_MATCH_DURATION_MINUTES desde el kickoff
+ *     (es decir, puede seguir en juego), O
+ *   - Empieza dentro de los próximos `windowMinutes` minutos.
+ *
+ * Para la fase eliminatoria, si `now` está dentro del rango de julio, siempre
+ * devuelve `true` (porque no tenemos fechas exactas en el fixture estático).
+ *
+ * Esta función es pura (sin I/O) y se ejecuta en < 1ms.
+ */
+export function hasUpcomingOrActiveMatch(now: Date, windowMinutes = 120): boolean {
+  const nowMs = now.getTime()
+
+  // Fase eliminatoria: siempre activo dentro del período
+  if (nowMs >= ELIMINATION_PHASE_START.getTime() && nowMs <= ELIMINATION_PHASE_END.getTime()) {
+    return true
+  }
+
+  for (const match of MATCHES) {
+    if (match.phase !== 'group') continue
+    const kickoff = new Date(match.date).getTime()
+    const matchEnd = kickoff + MAX_MATCH_DURATION_MINUTES * 60_000
+    const upcomingCutoff = kickoff - windowMinutes * 60_000
+
+    // En curso: kickoff ya pasó pero el partido puede seguir jugándose
+    const isActive = nowMs >= kickoff && nowMs <= matchEnd
+    // Próximo: arranca dentro de la ventana futura
+    const isUpcoming = nowMs >= upcomingCutoff && nowMs < kickoff
+
+    if (isActive || isUpcoming) return true
+  }
+
+  return false
+}
