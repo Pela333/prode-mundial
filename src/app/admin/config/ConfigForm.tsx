@@ -11,6 +11,8 @@ interface ConfigFormProps {
   initialRevealAt: string | null
   r32FirstDeadline: string | null
   r32RestDeadline: string | null
+  revealR32FirstAt: string | null
+  revealR32RestAt: string | null
 }
 
 /**
@@ -44,6 +46,8 @@ export default function ConfigForm(props: ConfigFormProps) {
   const [revealAt, setRevealAt] = useState(isoToLocalInput(props.initialRevealAt))
   const [r32First, setR32First] = useState(isoToLocalInput(props.r32FirstDeadline))
   const [r32Rest, setR32Rest] = useState(isoToLocalInput(props.r32RestDeadline))
+  const [revealR32First, setRevealR32First] = useState(isoToLocalInput(props.revealR32FirstAt))
+  const [revealR32Rest, setRevealR32Rest] = useState(isoToLocalInput(props.revealR32RestAt))
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -52,7 +56,9 @@ export default function ConfigForm(props: ConfigFormProps) {
     groupDeadline !== isoToLocalInput(props.initialGroupDeadline) ||
     revealAt !== isoToLocalInput(props.initialRevealAt) ||
     r32First !== isoToLocalInput(props.r32FirstDeadline) ||
-    r32Rest !== isoToLocalInput(props.r32RestDeadline)
+    r32Rest !== isoToLocalInput(props.r32RestDeadline) ||
+    revealR32First !== isoToLocalInput(props.revealR32FirstAt) ||
+    revealR32Rest !== isoToLocalInput(props.revealR32RestAt)
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -65,6 +71,8 @@ export default function ConfigForm(props: ConfigFormProps) {
         revealPredictionsAt: localInputToIso(revealAt),
         r32FirstDeadline: localInputToIso(r32First),
         r32RestDeadline: localInputToIso(r32Rest),
+        revealR32FirstAt: localInputToIso(revealR32First),
+        revealR32RestAt: localInputToIso(revealR32Rest),
       })
       if (res.error) { setError(res.error); return }
       setSuccess(true)
@@ -73,7 +81,7 @@ export default function ConfigForm(props: ConfigFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Editables */}
+      {/* Fase de Grupos */}
       <section className="rounded-2xl bg-[#111827] border border-white/8 p-5 space-y-4">
         <h2 className="text-white font-semibold text-sm flex items-center gap-2">
           <Calendar size={14} className="text-amber-400" /> Fase de Grupos
@@ -86,11 +94,11 @@ export default function ConfigForm(props: ConfigFormProps) {
         />
 
         <h2 className="text-white font-semibold text-sm flex items-center gap-2 pt-2">
-          <Eye size={14} className="text-amber-400" /> Visibilidad de pronósticos ajenos
+          <Eye size={14} className="text-amber-400" /> Visibilidad de pronósticos ajenos (Fase de Grupos)
         </h2>
         <DatetimeField
           label="Revelar a partir de"
-          help="A partir de esta fecha, todos los participantes pueden ver los pronósticos de los demás. Antes, sólo el dueño y el admin tienen acceso."
+          help="A partir de esta fecha, todos los participantes pueden ver los pronósticos ajenos de la fase de grupos. Antes, sólo el dueño y el admin tienen acceso."
           value={revealAt}
           onChange={setRevealAt}
         />
@@ -99,7 +107,7 @@ export default function ConfigForm(props: ConfigFormProps) {
       {/* Eliminatoria deadlines */}
       <section className="rounded-2xl bg-[#111827] border border-white/8 p-5 space-y-4">
         <h2 className="text-white font-semibold text-sm flex items-center gap-2">
-          <Calendar size={14} className="text-amber-400" /> Fase Eliminatoria
+          <Calendar size={14} className="text-amber-400" /> Fase Eliminatoria — Fechas límite de envío
         </h2>
         <p className="text-slate-500 text-xs leading-relaxed">
           Estas fechas límite se calculan automáticamente a partir de los partidos reales de la API (1 hora antes de iniciar). Podés modificarlas manualmente aquí si la API llega a fallar.
@@ -113,6 +121,25 @@ export default function ConfigForm(props: ConfigFormProps) {
           label="Deadline resto de la eliminatoria"
           value={r32Rest}
           onChange={setR32Rest}
+        />
+
+        <h2 className="text-white font-semibold text-sm flex items-center gap-2 pt-2">
+          <Eye size={14} className="text-amber-400" /> Visibilidad de pronósticos ajenos (Fase Eliminatoria)
+        </h2>
+        <p className="text-slate-500 text-xs leading-relaxed">
+          Controla cuándo cada participante puede ver los pronósticos de los demás en la fase eliminatoria. Se manejan de forma separada para el 1er partido y el resto, manteniendo la emoción hasta que cierre cada ventana de envío.
+        </p>
+        <DatetimeField
+          label="Revelar pronósticos del 1er partido a partir de"
+          help="Una vez pasada esta fecha, todos pueden ver los pronósticos ajenos del partido R32_1. Recomendado: igual o posterior al deadline de envío del 1er partido."
+          value={revealR32First}
+          onChange={setRevealR32First}
+        />
+        <DatetimeField
+          label="Revelar pronósticos del resto de la eliminatoria a partir de"
+          help="Una vez pasada esta fecha, todos pueden ver los pronósticos ajenos de todos los demás partidos eliminatorios. Recomendado: igual o posterior al deadline del resto de la eliminatoria."
+          value={revealR32Rest}
+          onChange={setRevealR32Rest}
         />
       </section>
 
@@ -165,3 +192,4 @@ function ReadField({ label, value }: { label: string; value: string }) {
     </div>
   )
 }
+

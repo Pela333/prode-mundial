@@ -218,21 +218,35 @@ export interface MatchPredictionsResult {
 
 export async function getMatchPredictionsAction(matchId: string): Promise<MatchPredictionsResult> {
   const isElim = !/^[A-L]\d+$/.test(matchId)
+  const isR32First = matchId === 'R32_1'
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { locked: true, revealDate: null, error: 'No autenticado' }
 
-  // 1. Obtener app config para reveal_predictions_at
+  // 1. Obtener app config con todas las fechas de revelación
   const { data: config, error: configErr } = await supabase
     .from('app_config_public')
-    .select('reveal_predictions_at')
+    .select('reveal_predictions_at, reveal_r32_first_at, reveal_r32_rest_at')
     .single()
 
   if (configErr) {
     return { locked: true, revealDate: null, error: 'Error al consultar la configuración' }
   }
 
-  // 2. Verificar rol del usuario
+  // 2. Determinar la fecha de revelación según el tipo de partido:
+  //    - Fase de grupos          → reveal_predictions_at
+  //    - 1er partido elim (R32_1)→ reveal_r32_first_at  (fallback: reveal_predictions_at)
+  //    - Resto de la elim        → reveal_r32_rest_at   (fallback: reveal_predictions_at)
+  let revealDateIso: string | null
+  if (!isElim) {
+    revealDateIso = config?.reveal_predictions_at ?? null
+  } else if (isR32First) {
+    revealDateIso = config?.reveal_r32_first_at ?? config?.reveal_predictions_at ?? null
+  } else {
+    revealDateIso = config?.reveal_r32_rest_at ?? config?.reveal_predictions_at ?? null
+  }
+
+  // 3. Verificar rol del usuario
   const { data: profile } = await supabase
     .from('profiles')
     .select('role')
@@ -240,10 +254,10 @@ export async function getMatchPredictionsAction(matchId: string): Promise<MatchP
     .maybeSingle()
 
   const isAdmin = profile?.role === 'admin'
-  const revealDate = config?.reveal_predictions_at ? new Date(config.reveal_predictions_at) : null
+  const revealDate = revealDateIso ? new Date(revealDateIso) : null
   const isRevealed = revealDate && revealDate.getTime() <= Date.now()
 
-  // 3. Si no está revelado y no es admin, solo devolvemos su propia predicción
+  // 4. Si no está revelado y no es admin, solo devolvemos su propia predicción
   if (!isAdmin && !isRevealed) {
     const { data: ownPred } = await supabase
       .from('predictions')
@@ -274,19 +288,19 @@ export async function getMatchPredictionsAction(matchId: string): Promise<MatchP
 
     return {
       locked: true,
-      revealDate: config?.reveal_predictions_at ?? null,
+      revealDate: revealDateIso,
       predictions: ownList,
     }
   }
 
-  // 4. Si está revelado o es admin, traemos todas
+  // 5. Si está revelado o es admin, traemos todas
   const { data: allPreds, error: predsErr } = await supabase
     .from('predictions')
     .select('user_id, home_score, away_score, home_score_120, away_score_120, pen_winner, result_points, bonus_points')
     .eq('match_id', matchId)
 
   if (predsErr) {
-    return { locked: false, revealDate: config?.reveal_predictions_at ?? null, error: 'Error al consultar predicciones' }
+    return { locked: false, revealDate: revealDateIso, error: 'Error al consultar predicciones' }
   }
 
   const userIds = (allPreds ?? []).map(p => p.user_id)
@@ -299,7 +313,7 @@ export async function getMatchPredictionsAction(matchId: string): Promise<MatchP
       .in('id', userIds)
 
     if (profsErr) {
-      return { locked: false, revealDate: config?.reveal_predictions_at ?? null, error: 'Error al consultar perfiles' }
+      return { locked: false, revealDate: revealDateIso, error: 'Error al consultar perfiles' }
     }
 
     profilesMap = new Map(allProfs?.map(p => [p.id, p]) ?? [])
@@ -367,7 +381,7 @@ export async function getMatchPredictionsAction(matchId: string): Promise<MatchP
 
   return {
     locked: false,
-    revealDate: config?.reveal_predictions_at ?? null,
+    revealDate: revealDateIso,
     predictions: list,
   }
 }
