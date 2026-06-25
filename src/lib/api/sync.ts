@@ -25,6 +25,7 @@ import {
   type Match,
 } from '@/lib/fixture'
 import { recalcPointsForMatch, recalcGroupPositionBonus } from './recalc'
+import { deriveBracketFromResults } from './bracket'
 
 export interface SyncReport {
   startedAt: string
@@ -309,6 +310,12 @@ export async function syncFromApi(
     }
   }
 
+  // Cargar bracket actual para no pisar cruces ya definidos localmente si la API viene vacía
+  const { data: dbBracket } = await supabase
+    .from('bracket')
+    .select('match_id, home_team, away_team, defined')
+  const dbBracketMap = new Map((dbBracket ?? []).map(b => [b.match_id, b]))
+
   // 3b) Bracket / eliminatoria → bracket + results
   const bracketUpserts: {
     match_id: string; phase: Phase; position: number
@@ -326,24 +333,27 @@ export async function syncFromApi(
       const slot = bracketIdx.get(`${phase}|${position}`)
       if (!slot) return
 
-      const home = apiTeamToFixture(m.homeTeam.name)
-      const away = apiTeamToFixture(m.awayTeam.name)
-      const defined = !!(home && away)
-
       matchIdMap.set(m.id, slot.id)
+      const dbRow = dbBracketMap.get(slot.id)
+
+      // La API no define los equipos ni el estado 'defined' del bracket local.
+      // Esto se calcula únicamente a través de deriveBracketFromResults en base a los resultados reales de la app.
+      const finalDefined = dbRow?.defined ?? false
+      const finalHome = dbRow?.home_team ?? null
+      const finalAway = dbRow?.away_team ?? null
 
       bracketUpserts.push({
         match_id: slot.id,
         phase,
         position,
-        home_team: home,
-        away_team: away,
+        home_team: finalHome,
+        away_team: finalAway,
         scheduled_at: m.utcDate,
-        defined,
+        defined: finalDefined,
       })
 
       // Sólo persistimos result si el partido tiene equipos definidos (sino no tiene sentido)
-      if (defined) {
+      if (finalDefined) {
         elimResults.push(apiMatchToResult(m, slot.id, phase, overriddenMap))
       }
     })
@@ -409,6 +419,13 @@ export async function syncFromApi(
     await recalcGroupPositionBonus(supabase)
   } catch (err) {
     report.errors.push(`recalcGroupPositionBonus: ${(err as Error).message}`)
+  }
+
+  // 4c) Derivar automáticamente cruces eliminatorios si se completaron grupos
+  try {
+    await deriveBracketFromResults(supabase)
+  } catch (err) {
+    report.errors.push(`deriveBracketFromResults: ${(err as Error).message}`)
   }
 
   await markSync(supabase, report.errors.length === 0 ? 'ok' : 'error')

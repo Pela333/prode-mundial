@@ -19,8 +19,12 @@ ALTER TABLE public.app_config
   ADD COLUMN IF NOT EXISTS reveal_r32_first_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS reveal_r32_rest_at  TIMESTAMPTZ;
 
+-- Dropear la vista y función existentes primero porque cambia el tipo de retorno (RETURNS TABLE)
+-- Usamos CASCADE porque la política predictions_select depende de la vista.
+DROP VIEW IF EXISTS public.app_config_public CASCADE;
+DROP FUNCTION IF EXISTS public.get_app_config_public();
+
 -- Recrear la función SECURITY DEFINER que expone los campos no sensibles
--- (necesario porque la función define explícitamente las columnas devueltas)
 CREATE OR REPLACE FUNCTION public.get_app_config_public()
 RETURNS TABLE (
   id                          INTEGER,
@@ -60,8 +64,25 @@ REVOKE EXECUTE ON FUNCTION public.get_app_config_public() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_app_config_public() TO anon, authenticated;
 
 -- Recrear la vista (lee de la función, hereda los nuevos campos automáticamente)
-DROP VIEW IF EXISTS public.app_config_public;
+DROP VIEW IF EXISTS public.app_config_public CASCADE;
 CREATE VIEW public.app_config_public AS
 SELECT * FROM public.get_app_config_public();
 
 GRANT SELECT ON public.app_config_public TO anon, authenticated;
+
+-- Recrear la política predictions_select en la tabla predictions que fue borrada por el CASCADE.
+-- Ahora esta política respeta las fechas de revelación de eliminatorias independientes.
+DROP POLICY IF EXISTS "predictions_select" ON public.predictions;
+CREATE POLICY "predictions_select" ON public.predictions
+  FOR SELECT TO authenticated USING (
+    auth.uid() = user_id
+    OR EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role = 'admin')
+    OR EXISTS (
+      SELECT 1 FROM public.app_config_public
+      WHERE id = 1 AND (
+        (phase = 'group' AND reveal_predictions_at IS NOT NULL AND reveal_predictions_at <= NOW())
+        OR (match_id = 'R32_1' AND COALESCE(reveal_r32_first_at, reveal_predictions_at) IS NOT NULL AND COALESCE(reveal_r32_first_at, reveal_predictions_at) <= NOW())
+        OR (phase <> 'group' AND match_id <> 'R32_1' AND COALESCE(reveal_r32_rest_at, reveal_predictions_at) IS NOT NULL AND COALESCE(reveal_r32_rest_at, reveal_predictions_at) <= NOW())
+      )
+    )
+  );
