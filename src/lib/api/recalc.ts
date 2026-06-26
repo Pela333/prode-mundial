@@ -424,6 +424,61 @@ export async function recalcGroupPositionBonus(supabase: SupabaseClient): Promis
 }
 
 /**
+ * Helper to fetch all predictions paginated from DB to avoid the default 1000 limit.
+ */
+async function fetchPredictionsPaginated(
+  supabase: SupabaseClient,
+  options: {
+    phase?: 'group'
+    excludePhase?: 'group'
+    userIds?: string[]
+    select: string
+  }
+): Promise<any[]> {
+  let allPreds: any[] = []
+  let page = 0
+  const pageSize = 1000
+  let hasMore = true
+
+  while (hasMore) {
+    const fromRange = page * pageSize
+    const toRange = (page + 1) * pageSize - 1
+    let query = supabase
+      .from('predictions')
+      .select(options.select)
+      .range(fromRange, toRange)
+
+    if (options.phase) {
+      query = query.eq('phase', options.phase)
+    }
+    if (options.excludePhase) {
+      query = query.neq('phase', options.excludePhase)
+    }
+    if (options.userIds && options.userIds.length > 0) {
+      query = query.in('user_id', options.userIds)
+    }
+
+    const { data, error } = await query
+    if (error) {
+      throw new Error(`fetchPredictionsPaginated: ${error.message}`)
+    }
+
+    if (!data || data.length === 0) {
+      hasMore = false
+    } else {
+      allPreds = allPreds.concat(data)
+      if (data.length < pageSize) {
+        hasMore = false
+      } else {
+        page++
+      }
+    }
+  }
+
+  return allPreds
+}
+
+/**
  * Para cada usuario, computa las posiciones de grupo según SUS pronósticos (Fase 1),
  * y devuelve un mapa userId → (team → position).
  *
@@ -446,14 +501,18 @@ async function computeUserStandingsBatch(
 
   if (submittedUsers.size === 0) return result
 
-  // Carga predictions de fase grupos
-  const { data: preds } = await supabase
-    .from('predictions')
-    .select('user_id, match_id, home_score, away_score')
-    .eq('phase', 'group')
-    .in('user_id', [...submittedUsers])
-
-  if (!preds) return result
+  // Carga predictions de fase grupos paginado
+  let preds: any[] = []
+  try {
+    preds = await fetchPredictionsPaginated(supabase, {
+      phase: 'group',
+      userIds: [...submittedUsers],
+      select: 'user_id, match_id, home_score, away_score'
+    })
+  } catch (err) {
+    console.error('Error fetching group predictions paginated:', err)
+    return result
+  }
 
   // Indexa predicciones por (user, matchId)
   const userMatchPred = new Map<string, Map<string, { home: number; away: number }>>()
@@ -780,15 +839,21 @@ export async function computeUserBracketsBatch(
   if (!bracketRows || bracketRows.length === 0) return result
   const r32Map = new Map(bracketRows.map(b => [b.match_id, b]))
 
-  // Load predictions for knockout phase for userIds
-  const { data: preds } = await supabase
-    .from('predictions')
-    .select('user_id, match_id, home_score_120, away_score_120, pen_winner')
-    .in('user_id', userIds)
-    .neq('phase', 'group')
+  // Load predictions for knockout phase for userIds paginated
+  let preds: any[] = []
+  try {
+    preds = await fetchPredictionsPaginated(supabase, {
+      excludePhase: 'group',
+      userIds: userIds,
+      select: 'user_id, match_id, home_score_120, away_score_120, pen_winner'
+    })
+  } catch (err) {
+    console.error('Error fetching knockout predictions paginated in computeUserBracketsBatch:', err)
+    return result
+  }
 
   const userPreds = new Map<string, Map<string, any>>()
-  for (const p of preds ?? []) {
+  for (const p of preds) {
     if (!userPreds.has(p.user_id)) userPreds.set(p.user_id, new Map())
     userPreds.get(p.user_id)!.set(p.match_id, p)
   }
@@ -841,15 +906,21 @@ async function computeUserPodiumPredictions(
 
   const userBrackets = await computeUserBracketsBatch(supabase, userIds)
 
-  // Load predictions for knockout phase for userIds
-  const { data: preds } = await supabase
-    .from('predictions')
-    .select('user_id, match_id, home_score_120, away_score_120, pen_winner')
-    .in('user_id', userIds)
-    .neq('phase', 'group')
+  // Load predictions for knockout phase for userIds paginated
+  let preds: any[] = []
+  try {
+    preds = await fetchPredictionsPaginated(supabase, {
+      excludePhase: 'group',
+      userIds: userIds,
+      select: 'user_id, match_id, home_score_120, away_score_120, pen_winner'
+    })
+  } catch (err) {
+    console.error('Error fetching knockout predictions paginated in computeUserPodiumPredictions:', err)
+    return result
+  }
 
   const userPreds = new Map<string, Map<string, any>>()
-  for (const p of preds ?? []) {
+  for (const p of preds) {
     if (!userPreds.has(p.user_id)) userPreds.set(p.user_id, new Map())
     userPreds.get(p.user_id)!.set(p.match_id, p)
   }
