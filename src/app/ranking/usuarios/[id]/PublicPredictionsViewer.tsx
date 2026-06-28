@@ -69,22 +69,22 @@ export default function PublicPredictionsViewer(props: Props) {
   }, [props.bracket])
 
   const WINNER_PROPAGATION = useMemo(() => ({
-    'R16_1': { home: 'R32_1',  away: 'R32_2'  },
+    'R16_1': { home: 'R32_1',  away: 'R32_4'  },
     'R16_2': { home: 'R32_3',  away: 'R32_6'  },
-    'R16_3': { home: 'R32_4',  away: 'R32_5'  },
+    'R16_3': { home: 'R32_2',  away: 'R32_5'  },
     'R16_4': { home: 'R32_7',  away: 'R32_8'  },
-    'R16_5': { home: 'R32_12', away: 'R32_10' },
-    'R16_6': { home: 'R32_14', away: 'R32_9'  },
-    'R16_7': { home: 'R32_13', away: 'R32_16' },
-    'R16_8': { home: 'R32_11', away: 'R32_15' },
+    'R16_5': { home: 'R32_12', away: 'R32_11' },
+    'R16_6': { home: 'R32_10', away: 'R32_9'  },
+    'R16_7': { home: 'R32_15', away: 'R32_14' },
+    'R16_8': { home: 'R32_13', away: 'R32_16' },
 
     'QF_1': { home: 'R16_1', away: 'R16_2' },
     'QF_2': { home: 'R16_3', away: 'R16_4' },
     'QF_3': { home: 'R16_5', away: 'R16_6' },
     'QF_4': { home: 'R16_7', away: 'R16_8' },
 
-    'SF_1': { home: 'QF_1', away: 'QF_2' },
-    'SF_2': { home: 'QF_3', away: 'QF_4' },
+    'SF_1': { home: 'QF_1', away: 'QF_3' },
+    'SF_2': { home: 'QF_2', away: 'QF_4' },
 
     'FINAL': { home: 'SF_1', away: 'SF_2' },
     'THIRD': { home: 'SF_1', away: 'SF_2', losers: true },

@@ -88,22 +88,22 @@ const R32_WITH_THIRDS: {
 
 const WINNER_PROPAGATION: Record<string, { home: string; away: string; losers?: true }> = {
   // R16 (8 partidos)
-  // Match 89: W(M73) vs W(M75)  → R32_1 vs R32_2
-  'R16_1': { home: 'R32_1',  away: 'R32_2'  },
+  // Match 89: W(M73) vs W(M75)  → R32_1 vs R32_4
+  'R16_1': { home: 'R32_1',  away: 'R32_4'  },
   // Match 90: W(M74) vs W(M77)  → R32_3 vs R32_6
   'R16_2': { home: 'R32_3',  away: 'R32_6'  },
-  // Match 91: W(M76) vs W(M78)  → R32_4 vs R32_5
-  'R16_3': { home: 'R32_4',  away: 'R32_5'  },
+  // Match 91: W(M76) vs W(M78)  → R32_2 vs R32_5
+  'R16_3': { home: 'R32_2',  away: 'R32_5'  },
   // Match 92: W(M79) vs W(M80)  → R32_7 vs R32_8
   'R16_4': { home: 'R32_7',  away: 'R32_8'  },
-  // Match 93: W(M83) vs W(M84)  → R32_12 vs R32_10
-  'R16_5': { home: 'R32_12', away: 'R32_10' },
-  // Match 94: W(M81) vs W(M82)  → R32_14 vs R32_9
-  'R16_6': { home: 'R32_14', away: 'R32_9'  },
-  // Match 95: W(M86) vs W(M88)  → R32_13 vs R32_16
-  'R16_7': { home: 'R32_13', away: 'R32_16' },
-  // Match 96: W(M85) vs W(M87)  → R32_11 vs R32_15
-  'R16_8': { home: 'R32_11', away: 'R32_15' },
+  // Match 93: W(M83) vs W(M84)  → R32_12 vs R32_11
+  'R16_5': { home: 'R32_12', away: 'R32_11' },
+  // Match 94: W(M81) vs W(M82)  → R32_10 vs R32_9
+  'R16_6': { home: 'R32_10', away: 'R32_9'  },
+  // Match 95: W(M86) vs W(M88)  → R32_15 vs R32_14
+  'R16_7': { home: 'R32_15', away: 'R32_14' },
+  // Match 96: W(M85) vs W(M87)  → R32_13 vs R32_16
+  'R16_8': { home: 'R32_13', away: 'R32_16' },
 
   // QF (4 partidos)
   'QF_1': { home: 'R16_1', away: 'R16_2' },
@@ -111,9 +111,9 @@ const WINNER_PROPAGATION: Record<string, { home: string; away: string; losers?: 
   'QF_3': { home: 'R16_5', away: 'R16_6' },
   'QF_4': { home: 'R16_7', away: 'R16_8' },
 
-  // SF
-  'SF_1': { home: 'QF_1', away: 'QF_2' },
-  'SF_2': { home: 'QF_3', away: 'QF_4' },
+  // SF (Match 101: QF_1 vs QF_3 / Match 102: QF_2 vs QF_4)
+  'SF_1': { home: 'QF_1', away: 'QF_3' },
+  'SF_2': { home: 'QF_2', away: 'QF_4' },
 
   // Final y tercer puesto
   'FINAL': { home: 'SF_1', away: 'SF_2' },
