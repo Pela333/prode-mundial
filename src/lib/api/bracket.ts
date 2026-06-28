@@ -25,6 +25,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { GROUPS, MATCHES, BRACKET_SLOTS, FIFA_RANKINGS, type Phase } from '@/lib/fixture'
 import { computeGroupStandings, computeDetailedLiveStandings, type GroupMatch } from '@/lib/standings'
+import { BRACKET_COMBINATIONS } from './bracketCombinations'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mapping interno: R32 slot → { home, away } en términos de grupo+posición
@@ -238,38 +239,6 @@ async function computeThirdStats(supabase: SupabaseClient): Promise<ThirdStats[]
 // Función principal
 // ─────────────────────────────────────────────────────────────────────────────
 
-function findValidAllocation(
-  slots: typeof R32_WITH_THIRDS,
-  qualifiedGroups: string[]
-): Map<string, string> | null {
-  const assignment = new Map<string, string>() // slot -> group
-  const usedGroups = new Set<string>()
-
-  function backtrack(index: number): boolean {
-    if (index === slots.length) {
-      return true
-    }
-
-    const currentSlot = slots[index]
-    for (const group of currentSlot.possibleThirdGroups) {
-      if (qualifiedGroups.includes(group) && !usedGroups.has(group)) {
-        usedGroups.add(group)
-        assignment.set(currentSlot.slot, group)
-        if (backtrack(index + 1)) {
-          return true
-        }
-        usedGroups.delete(group)
-        assignment.delete(currentSlot.slot)
-      }
-    }
-    return false
-  }
-
-  if (backtrack(0)) {
-    return assignment
-  }
-  return null
-}
 
 export interface BracketDeriveReport {
   r32Slots: number
@@ -420,14 +389,14 @@ export async function deriveBracketFromResults(supabase: SupabaseClient): Promis
 
   // 3b. Partidos con terceros
   if (best8ThirdsByGroup) {
-    const qualifiedGroups = Array.from(best8ThirdsByGroup.keys())
-    const allocation = findValidAllocation(R32_WITH_THIRDS, qualifiedGroups)
+    const qualifiedGroupsKey = Array.from(best8ThirdsByGroup.keys()).sort().join('')
+    const allocation = BRACKET_COMBINATIONS[qualifiedGroupsKey]
 
     if (allocation) {
       for (const entry of R32_WITH_THIRDS) {
         if (finalizedGroups.has(entry.firstGroup)) {
           const homeTeam = standingsMap.get(entry.firstGroup)?.get(1)
-          const assignedGroup = allocation.get(entry.slot)
+          const assignedGroup = allocation[`1${entry.firstGroup}`]
           const awayTeam = assignedGroup ? best8ThirdsByGroup.get(assignedGroup) : null
 
           if (homeTeam && awayTeam) {
@@ -441,7 +410,7 @@ export async function deriveBracketFromResults(supabase: SupabaseClient): Promis
         }
       }
     } else {
-      report.errors.push(`No se encontró una asignación válida sin duplicados para los terceros clasificados`)
+      report.errors.push(`No se encontró una asignación oficial en la tabla FIFA para la combinación de terceros: ${qualifiedGroupsKey}`)
     }
   }
 

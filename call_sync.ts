@@ -26,7 +26,7 @@ const supabase = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE
 async function run() {
   console.log('--- EMPEZANDO SYNC ---')
   try {
-    const report = await syncFromApi(supabase)
+    const report = await syncFromApi(supabase, { bypassCache: true })
     console.log('Sync Report:', JSON.stringify(report, null, 2))
   } catch (err) {
     console.error('Error durante el sync:', err)
