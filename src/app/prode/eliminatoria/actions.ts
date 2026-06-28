@@ -82,16 +82,28 @@ export async function saveElimDraft({ matchId, homeScore120, awayScore120, penWi
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'No autenticado' }
 
-  // Validar bracket definido
-  if (!await isBracketDefined(supabase, matchId)) {
-    return { error: 'Este partido todavía no tiene equipos confirmados' }
+  // Validar bracket definido (en R32 según fixture real, en rondas siguientes según predicciones del usuario)
+  let matchTeams: { home: string | null; away: string | null } | undefined
+  if (phase !== 'r32') {
+    const userBrackets = await computeUserBracketsBatch(supabase, [user.id])
+    const userBracket = userBrackets.get(user.id)
+    matchTeams = userBracket?.get(matchId)
+    if (!matchTeams || !matchTeams.home || !matchTeams.away) {
+      return { error: 'Este partido todavía no tiene equipos confirmados' }
+    }
+  } else {
+    if (!await isBracketDefined(supabase, matchId)) {
+      return { error: 'Este partido todavía no tiene equipos confirmados' }
+    }
   }
 
   // Validar pen_winner es uno de los dos equipos del partido del usuario (si vino)
   if (penWinner !== null) {
-    const userBrackets = await computeUserBracketsBatch(supabase, [user.id])
-    const userBracket = userBrackets.get(user.id)
-    const matchTeams = userBracket?.get(matchId)
+    if (!matchTeams) {
+      const userBrackets = await computeUserBracketsBatch(supabase, [user.id])
+      const userBracket = userBrackets.get(user.id)
+      matchTeams = userBracket?.get(matchId)
+    }
     if (!matchTeams || (penWinner !== matchTeams.home && penWinner !== matchTeams.away)) {
       return { error: 'El ganador por penales debe ser uno de los dos equipos del partido' }
     }
