@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { GROUPS, MATCHES } from '@/lib/fixture'
 import { computeGroupStandings, type StandingRow, type GroupMatch } from '@/lib/standings'
-import { recalcPointsForUser } from '@/lib/api/recalc'
+import { recalcPointsForUser, computeUserBracketsBatch } from '@/lib/api/recalc'
 
 export interface SaveDraftInput {
   matchId: string
@@ -207,6 +207,9 @@ export interface MatchPrediction {
   awayScore120: number | null
   penWinner: string | null
   points: number
+  // Para partidos eliminatorios: los equipos que ESTE usuario pronosticó para este slot
+  predHomeTeam: string | null
+  predAwayTeam: string | null
 }
 
 export interface MatchPredictionsResult {
@@ -274,6 +277,20 @@ export async function getMatchPredictionsAction(matchId: string): Promise<MatchP
         .eq('id', user.id)
         .maybeSingle()
 
+      // Para partidos eliminatorios, obtener los equipos que el propio usuario pronosticó
+      let ownPredHomeTeam: string | null = null
+      let ownPredAwayTeam: string | null = null
+      if (isElim) {
+        try {
+          const userBracketsMap = await computeUserBracketsBatch(supabase, [user.id])
+          const slotTeams = userBracketsMap.get(user.id)?.get(matchId)
+          ownPredHomeTeam = slotTeams?.home ?? null
+          ownPredAwayTeam = slotTeams?.away ?? null
+        } catch (err) {
+          console.error('getMatchPredictionsAction (own): error computing user bracket:', err)
+        }
+      }
+
       ownList.push({
         name: ownProfile ? `${ownProfile.first_name} ${ownProfile.last_name}` : 'Vos',
         username: ownProfile?.username ?? '',
@@ -283,6 +300,8 @@ export async function getMatchPredictionsAction(matchId: string): Promise<MatchP
         awayScore120: ownPred.away_score_120,
         penWinner: ownPred.pen_winner,
         points: (ownPred.result_points ?? 0) + (ownPred.bonus_points ?? 0),
+        predHomeTeam: ownPredHomeTeam,
+        predAwayTeam: ownPredAwayTeam,
       })
     }
 
@@ -319,8 +338,20 @@ export async function getMatchPredictionsAction(matchId: string): Promise<MatchP
     profilesMap = new Map(allProfs?.map(p => [p.id, p]) ?? [])
   }
 
+  // Para partidos eliminatorios, calcular los equipos que cada usuario pronosticó para este slot
+  let userBracketsMap: Map<string, Map<string, { home: string | null; away: string | null }>> | null = null
+  if (isElim && userIds.length > 0) {
+    try {
+      userBracketsMap = await computeUserBracketsBatch(supabase, userIds)
+    } catch (err) {
+      console.error('getMatchPredictionsAction: error computing user brackets:', err)
+    }
+  }
+
   const list: MatchPrediction[] = (allPreds ?? []).map((p: any) => {
     const profile = profilesMap.get(p.user_id)
+    const userBracket = userBracketsMap?.get(p.user_id)
+    const slotTeams = userBracket?.get(matchId)
     return {
       name: profile ? `${profile.first_name} ${profile.last_name}` : 'Participante',
       username: profile?.username ?? '',
@@ -330,6 +361,8 @@ export async function getMatchPredictionsAction(matchId: string): Promise<MatchP
       awayScore120: p.away_score_120,
       penWinner: p.pen_winner,
       points: (p.result_points ?? 0) + (p.bonus_points ?? 0),
+      predHomeTeam: slotTeams?.home ?? null,
+      predAwayTeam: slotTeams?.away ?? null,
     }
   })
 
