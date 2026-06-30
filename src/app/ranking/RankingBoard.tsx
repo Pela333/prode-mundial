@@ -35,7 +35,7 @@ export default function RankingBoard({ rows, currentUserId }: Props) {
       list.sort((a, b) => {
         if (b.total_points !== a.total_points) return b.total_points - a.total_points
         if (b.exactos_total !== a.exactos_total) return b.exactos_total - a.exactos_total
-        if (b.aciertos_grupo !== a.aciertos_grupo) return b.aciertos_grupo - a.aciertos_grupo
+        if (b.pts_posicion_grupo !== a.pts_posicion_grupo) return b.pts_posicion_grupo - a.pts_posicion_grupo
         return b.pts_eliminatoria - a.pts_eliminatoria
       })
     } else {
@@ -50,15 +50,42 @@ export default function RankingBoard({ rows, currentUserId }: Props) {
     return list
   }, [rows, tab])
 
+  const computedRanks = useMemo(() => {
+    const ranks: number[] = []
+    let currentRank = 1
+    for (let i = 0; i < sortedRows.length; i++) {
+      if (i > 0) {
+        const prev = sortedRows[i - 1]
+        const curr = sortedRows[i]
+        const isTied = tab === 'general'
+          ? prev.total_points === curr.total_points &&
+            prev.exactos_total === curr.exactos_total &&
+            prev.pts_posicion_grupo === curr.pts_posicion_grupo &&
+            prev.pts_eliminatoria === curr.pts_eliminatoria
+          : (prev.total_points - prev.pts_eliminatoria - prev.pts_podio) === (curr.total_points - curr.pts_eliminatoria - curr.pts_podio) &&
+            prev.exactos_grupo === curr.exactos_grupo &&
+            prev.aciertos_grupo === curr.aciertos_grupo
+        if (!isTied) {
+          currentRank = i + 1
+        }
+      } else {
+        currentRank = 1
+      }
+      ranks.push(currentRank)
+    }
+    return ranks
+  }, [sortedRows, tab])
+
   const myRank = useMemo(() => {
-    return sortedRows.findIndex(r => r.user_id === currentUserId) + 1
-  }, [sortedRows, currentUserId])
+    const idx = sortedRows.findIndex(r => r.user_id === currentUserId)
+    return idx >= 0 ? computedRanks[idx] : 0
+  }, [sortedRows, computedRanks, currentUserId])
 
   const tieBuckets = useMemo(() => {
     const m = new Map<string, number>()
     for (const r of sortedRows) {
       const key = tab === 'general'
-        ? `${r.total_points}|${r.exactos_total}|${r.aciertos_grupo}|${r.pts_eliminatoria}`
+        ? `${r.total_points}|${r.exactos_total}|${r.pts_posicion_grupo}|${r.pts_eliminatoria}`
         : `${r.total_points - r.pts_eliminatoria - r.pts_podio}|${r.exactos_grupo}|${r.aciertos_grupo}`
       m.set(key, (m.get(key) ?? 0) + 1)
     }
@@ -125,7 +152,7 @@ export default function RankingBoard({ rows, currentUserId }: Props) {
         <div className="grid grid-cols-3 gap-3 mb-6">
           {[sortedRows[0], sortedRows[1], sortedRows[2]].map((r, i) => (
             <div key={r.user_id} className={`rounded-2xl border p-4 text-center ${podiumBg[i]} animate-fade-in-up`}>
-              <div className={`text-2xl font-black mb-1 ${podiumColors[i]}`}>#{i + 1}</div>
+              <div className={`text-2xl font-black mb-1 ${podiumColors[i]}`}>#{computedRanks[i]}</div>
               <div className="w-10 h-10 rounded-full bg-slate-700 mx-auto mb-2 flex items-center justify-center text-white font-bold text-lg">
                 {r.first_name?.[0]?.toUpperCase()}
               </div>
@@ -163,8 +190,9 @@ export default function RankingBoard({ rows, currentUserId }: Props) {
 
         {sortedRows.map((r, i) => {
           const isMe = r.user_id === currentUserId
+          const rank = computedRanks[i]
           const tieKey = tab === 'general'
-            ? `${r.total_points}|${r.exactos_total}|${r.aciertos_grupo}|${r.pts_eliminatoria}`
+            ? `${r.total_points}|${r.exactos_total}|${r.pts_posicion_grupo}|${r.pts_eliminatoria}`
             : `${r.total_points - r.pts_eliminatoria - r.pts_podio}|${r.exactos_grupo}|${r.aciertos_grupo}`
           const tied = (tieBuckets.get(tieKey) ?? 0) > 1
           return (
@@ -173,8 +201,8 @@ export default function RankingBoard({ rows, currentUserId }: Props) {
               className={`grid grid-cols-[2rem_1fr_auto_auto_auto] gap-4 px-4 py-3 items-center border-b border-white/4 last:border-0 transition-colors
                 ${isMe ? 'bg-amber-500/5 border-l-2 border-l-amber-500' : 'hover:bg-white/2'}`}
             >
-              <span className={`text-sm font-bold ${i < 3 ? podiumColors[i] : 'text-slate-500'}`}>
-                {i + 1}
+              <span className={`text-sm font-bold ${rank <= 3 ? podiumColors[rank - 1] : 'text-slate-500'}`}>
+                {rank}
                 {tied && <span className="text-slate-600 ml-0.5" title="Empate técnico">⇄</span>}
               </span>
 
