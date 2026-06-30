@@ -488,7 +488,17 @@ export async function deriveBracketFromResults(supabase: SupabaseClient): Promis
         away_team: desired.away_team,
         defined: desired.defined,
       })
-      slotsToReset.push(desired.match_id)
+      
+      // Solo resetear si ya estaba definido y los equipos cambiaron, o si dejó de estar definido.
+      // Si pasa de undefined a defined (progresión normal), NO se deben resetear predicciones ni desbloquear envíos.
+      const shouldReset = current && current.defined && (
+        !desired.defined ||
+        current.home_team !== desired.home_team ||
+        current.away_team !== desired.away_team
+      )
+      if (shouldReset) {
+        slotsToReset.push(desired.match_id)
+      }
     }
 
     // Contar slots definidos para el reporte
@@ -514,8 +524,16 @@ export async function deriveBracketFromResults(supabase: SupabaseClient): Promis
       // Para los slots que cambiaron, resetear resultados, predicciones y submissions
       const phasesToUnlock = new Set<string>()
 
+      // Obtener las fechas límite de app_config para ver si todavía es legal reabrir
+      const { data: config } = await supabase
+        .from('app_config')
+        .select('r32_first_deadline, r32_rest_deadline')
+        .single()
+
+      const now = Date.now()
+
       for (const matchId of slotsToReset) {
-        // A. Resetear resultado real
+        // A. Resetear resultado real (siempre que cambien los equipos, el resultado anterior deja de ser válido)
         const { error: resultError } = await supabase
           .from('results')
           .upsert({
@@ -541,25 +559,30 @@ export async function deriveBracketFromResults(supabase: SupabaseClient): Promis
           report.errors.push(`Error al resetear resultado para ${matchId}: ${resultError.message}`)
         }
 
-        // B. Borrar predicciones de usuarios para este partido
-        const { error: predError } = await supabase
-          .from('predictions')
-          .delete()
-          .eq('match_id', matchId)
+        // B. Borrar predicciones y desbloquear envíos sólo si la fecha límite no ha pasado aún
+        const deadlineVal = matchId === 'R32_1' ? config?.r32_first_deadline : config?.r32_rest_deadline
+        const deadlinePassed = deadlineVal ? new Date(deadlineVal).getTime() < now : false
 
-        if (predError) {
-          report.errors.push(`Error al borrar predicciones para ${matchId}: ${predError.message}`)
-        }
+        if (!deadlinePassed) {
+          const { error: predError } = await supabase
+            .from('predictions')
+            .delete()
+            .eq('match_id', matchId)
 
-        // C. Determinar fase de envío a desbloquear
-        if (matchId === 'R32_1') {
-          phasesToUnlock.add('r32_first')
-        } else {
-          phasesToUnlock.add('r32_rest')
+          if (predError) {
+            report.errors.push(`Error al borrar predicciones para ${matchId}: ${predError.message}`)
+          }
+
+          // C. Determinar fase de envío a desbloquear
+          if (matchId === 'R32_1') {
+            phasesToUnlock.add('r32_first')
+          } else {
+            phasesToUnlock.add('r32_rest')
+          }
         }
       }
 
-      // D. Borrar submissions para desbloquear envío de predicciones
+      // D. Borrar submissions para desbloquear envío de predicciones (solo si no pasó la deadline)
       if (phasesToUnlock.size > 0) {
         const { error: subError } = await supabase
           .from('submissions')
