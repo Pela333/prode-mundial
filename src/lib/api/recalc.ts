@@ -446,6 +446,8 @@ async function fetchPredictionsPaginated(
     let query = supabase
       .from('predictions')
       .select(options.select)
+      .order('user_id')
+      .order('match_id')
       .range(fromRange, toRange)
 
     if (options.phase) {
