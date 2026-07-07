@@ -16,6 +16,8 @@ export interface PredItem {
   pen_winner: string | null
   result_points: number | null
   bonus_points: number | null
+  is_edited?: boolean
+  edited_at?: string | null
 }
 
 export interface ResultItem {
@@ -347,10 +349,18 @@ function Row({
   return (
     <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-3 px-4 py-3 items-center text-sm">
       <div className="flex flex-col gap-1 min-w-0">
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 flex-wrap">
           {predHome ? <TeamName name={predHome} size="sm" /> : <span className="text-slate-600 italic text-xs">A definir</span>}
           <span className="text-slate-600 text-xs">vs</span>
           {predAway ? <TeamName name={predAway} size="sm" /> : <span className="text-slate-600 italic text-xs">A definir</span>}
+          {pred?.is_edited && pred.edited_at && (
+            <span 
+              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20 cursor-help select-none"
+              title={`Modificado por admin el ${new Date(pred.edited_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`}
+            >
+              Editado
+            </span>
+          )}
         </div>
         {isElim && realHome && realAway && real && real.status !== 'scheduled' && (
           <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-semibold uppercase tracking-wide">

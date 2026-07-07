@@ -74,6 +74,8 @@ export async function adminUpdatePredictionAction(input: AdminEditPredictionInpu
         home_score_120: phase !== 'group' ? input.homeScore120 : null,
         away_score_120: phase !== 'group' ? input.awayScore120 : null,
         pen_winner: phase !== 'group' ? input.penWinner : null,
+        is_edited: true,
+        edited_at: new Date().toISOString(),
       }, { onConflict: 'user_id,match_id' })
     if (error) return { error: 'No pudimos guardar la predicción' }
   }

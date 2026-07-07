@@ -47,7 +47,7 @@ export default async function AdminUserPredictionsPage({ params }: PageProps) {
   // Predictions del usuario
   const { data: preds } = await supabase
     .from('predictions')
-    .select('match_id, phase, home_score, away_score, home_score_120, away_score_120, pen_winner, result_points, bonus_points')
+    .select('match_id, phase, home_score, away_score, home_score_120, away_score_120, pen_winner, result_points, bonus_points, is_edited, edited_at')
     .eq('user_id', target.id)
 
   // Resultados (para mostrar comparativa)
@@ -73,6 +73,8 @@ export default async function AdminUserPredictionsPage({ params }: PageProps) {
     pen_winner: p.pen_winner,
     result_points: p.result_points,
     bonus_points: p.bonus_points,
+    is_edited: p.is_edited,
+    edited_at: p.edited_at,
   }))
 
   const resultList: ResultItem[] = (results ?? []).map(r => ({
