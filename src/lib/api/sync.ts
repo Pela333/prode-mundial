@@ -313,7 +313,7 @@ export async function syncFromApi(
   // Cargar bracket actual para no pisar cruces ya definidos localmente si la API viene vacía
   const { data: dbBracket } = await supabase
     .from('bracket')
-    .select('match_id, home_team, away_team, defined')
+    .select('match_id, home_team, away_team, defined, scheduled_at')
   const dbBracketMap = new Map((dbBracket ?? []).map(b => [b.match_id, b]))
 
   // 3b) Bracket / eliminatoria → bracket + results
@@ -328,35 +328,76 @@ export async function syncFromApi(
     const phase = STAGE_API_TO_PHASE[stage]
     if (!phase) continue
 
-    list.forEach((m, i) => {
-      const position = i + 1
-      const slot = bracketIdx.get(`${phase}|${position}`)
-      if (!slot) return
+    const phaseSlots = BRACKET_SLOTS.filter(s => s.phase === phase).sort((a, b) => a.position - b.position)
 
-      matchIdMap.set(m.id, slot.id)
+    // Mapeo robusto de matches de la API por equipos para los slots DEFINIDOS
+    const mappedApiMatches = new Set<number>()
+    const slotToApiMatch = new Map<string, { apiMatch: ApiMatch, isInverted: boolean }>()
+
+    for (const slot of phaseSlots) {
       const dbRow = dbBracketMap.get(slot.id)
+      if (!dbRow || !dbRow.defined || !dbRow.home_team || !dbRow.away_team) continue
 
-      // La API no define los equipos ni el estado 'defined' del bracket local.
-      // Esto se calcula únicamente a través de deriveBracketFromResults en base a los resultados reales de la app.
+      const match = list.find(m => {
+        if (mappedApiMatches.has(m.id)) return false
+
+        const apiHome = apiTeamToFixture(m.homeTeam.name)
+        const apiAway = apiTeamToFixture(m.awayTeam.name)
+
+        const matchNormal = apiHome === dbRow.home_team && apiAway === dbRow.away_team
+        const matchInverted = apiHome === dbRow.away_team && apiAway === dbRow.home_team
+
+        return matchNormal || matchInverted
+      })
+
+      if (match) {
+        const apiHome = apiTeamToFixture(match.homeTeam.name)
+        const isInverted = apiHome !== dbRow.home_team
+        slotToApiMatch.set(slot.id, { apiMatch: match, isInverted })
+        mappedApiMatches.add(match.id)
+      }
+    }
+
+    // Mapeo de slots restantes (indefinidos o no coincidentes) con matches restantes por orden cronológico
+    const remainingApiMatches = list.filter(m => !mappedApiMatches.has(m.id))
+    const remainingSlots = phaseSlots.filter(slot => !slotToApiMatch.has(slot.id))
+
+    remainingSlots.forEach((slot, idx) => {
+      const match = remainingApiMatches[idx]
+      if (match) {
+        slotToApiMatch.set(slot.id, { apiMatch: match, isInverted: false })
+        mappedApiMatches.add(match.id)
+      }
+    })
+
+    // Construir upserts y resultados usando el mapeo robusto
+    for (const slot of phaseSlots) {
+      const dbRow = dbBracketMap.get(slot.id)
       const finalDefined = dbRow?.defined ?? false
       const finalHome = dbRow?.home_team ?? null
       const finalAway = dbRow?.away_team ?? null
 
+      const mapping = slotToApiMatch.get(slot.id)
+      const scheduled_at = mapping ? mapping.apiMatch.utcDate : (dbRow?.scheduled_at ?? null)
+
+      if (mapping) {
+        matchIdMap.set(mapping.apiMatch.id, slot.id)
+      }
+
       bracketUpserts.push({
         match_id: slot.id,
         phase,
-        position,
+        position: slot.position,
         home_team: finalHome,
         away_team: finalAway,
-        scheduled_at: m.utcDate,
+        scheduled_at,
         defined: finalDefined,
       })
 
-      // Sólo persistimos result si el partido tiene equipos definidos (sino no tiene sentido)
-      if (finalDefined) {
-        elimResults.push(apiMatchToResult(m, slot.id, phase, overriddenMap))
+      if (finalDefined && mapping) {
+        elimResults.push(apiMatchToResult(mapping.apiMatch, slot.id, phase, overriddenMap, mapping.isInverted))
       }
-    })
+    }
   }
 
   if (bracketUpserts.length > 0) {
